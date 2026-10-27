@@ -1,0 +1,79 @@
+# Compile l'installateur Windows ET l'application Android, puis les met à disposition en téléchargement.
+# Lancement : onglet Actions -> « Build apps » -> Run workflow   (ou en créant un tag « v1.0.1 »).
+#
+# Secrets à créer (Settings -> Secrets and variables -> Actions) :
+#   VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY            projet Supabase de CETTE application
+# Facultatifs (signature Android, nécessaire pour pouvoir METTRE À JOUR l'appli sur les téléphones) :
+#   ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS, ANDROID_KEY_PASSWORD
+name: Build apps
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Installateur Windows
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+        run: npm run electron:build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: installateur-windows
+          path: release/*.exe
+          if-no-files-found: error
+
+  android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - run: npm ci
+      - name: Application web + synchronisation Android
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+        run: |
+          npm run build
+          npx cap sync android
+      - name: Compilation de l'APK
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          VERSION_CODE: ${{ github.run_number }}
+        run: |
+          cd android
+          chmod +x gradlew
+          if [ -n "$KEYSTORE_B64" ]; then
+            echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/release.keystore"
+            export KEYSTORE_FILE="$RUNNER_TEMP/release.keystore"
+            ./gradlew assembleRelease
+            cp app/build/outputs/apk/release/app-release.apk ../application-android.apk
+          else
+            echo "::warning::Aucune clé de signature : APK de TEST (non remplaçable par une version ultérieure). Voir PACKAGING.md."
+            ./gradlew assembleDebug
+            cp app/build/outputs/apk/debug/app-debug.apk ../application-android-TEST.apk
+          fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: application-android
+          path: "*.apk"
+          if-no-files-found: error
