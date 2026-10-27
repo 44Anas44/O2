@@ -19,7 +19,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-      - run: npm ci
+      - run: npm install  --legacy-peer-deps
       - name: Installateur Windows
         env:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
@@ -42,7 +42,7 @@ jobs:
         with:
           distribution: temurin
           java-version: 17
-      - run: npm ci
+      - run: npm install  --legacy-peer-deps
       - name: Application web + synchronisation Android
         env:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
