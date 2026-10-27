@@ -1,0 +1,80 @@
+import React, { useState } from 'react';
+import { FileTextIcon } from 'lucide-react';
+import type { Appointment, Sale } from '../types';
+import { useStore } from '../contexts/StoreContext';
+import { useAuth } from '../contexts/AuthContext';
+import { useSettings } from '../contexts/SettingsContext';
+import { downloadAppointmentSlip, downloadSaleReceipt } from '../pdf';
+import { Button } from './ui/Primitives';
+
+type Props = {size?: 'sm' | 'md';variant?: 'secondary' | 'ghost';label?: string;};
+
+function useBusy() {
+  const [busy, setBusy] = useState(false);
+  const run = async (task: () => Promise<void>) => {
+    setBusy(true);
+    try {
+      await task();
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.error(error);
+      window.alert('Impossible de générer le PDF.');
+    } finally {
+      setBusy(false);
+    }
+  };
+  return { busy, run };
+}
+
+export function SaleReceiptButton({ sale, size = 'sm', variant = 'secondary', label = 'Reçu PDF' }: Props & {sale: Sale;}) {
+  const { appointments } = useStore();
+  const { displayName } = useAuth();
+  const { center } = useSettings();
+  const { busy, run } = useBusy();
+  return (
+    <Button
+      size={size}
+      variant={variant}
+      disabled={busy}
+      onClick={() =>
+      run(() =>
+      downloadSaleReceipt({
+        sale,
+        appointment: appointments.find((a) => a.id === sale.appointmentId) ?? null,
+        center,
+        generatedBy: displayName
+      })
+      )
+      }>
+      <FileTextIcon className="h-4 w-4" />
+      {label}
+    </Button>);
+
+}
+
+export function AppointmentSlipButton({ appointment, size = 'sm', variant = 'secondary', label = 'Bon PDF' }: Props & {appointment: Appointment;}) {
+  const { services, sales } = useStore();
+  const { displayName } = useAuth();
+  const { center } = useSettings();
+  const { busy, run } = useBusy();
+  return (
+    <Button
+      size={size}
+      variant={variant}
+      disabled={busy}
+      onClick={() =>
+      run(() =>
+      downloadAppointmentSlip({
+        appointment,
+        service: services.find((s) => s.id === appointment.serviceId) ?? null,
+        sale: sales.find((s) => s.id === appointment.saleId || s.appointmentId === appointment.id) ?? null,
+        center,
+        generatedBy: displayName
+      })
+      )
+      }>
+      <FileTextIcon className="h-4 w-4" />
+      {label}
+    </Button>);
+
+}
