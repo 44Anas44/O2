@@ -1,7 +1,7 @@
 # Compile l'installateur Windows ET l'application Android, puis les met à disposition en téléchargement.
 # Lancement : onglet Actions -> « Build apps » -> Run workflow   (ou en créant un tag « v1.0.1 »).
 #
-# Secrets à créer (Settings -> Secrets and variables -> Actions) :
+# Secrets à créer (Settings -> Secrets and variables -> Actions) :npm ci
 #   VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY            projet Supabase de CETTE application
 # Facultatifs (signature Android, nécessaire pour pouvoir METTRE À JOUR l'appli sur les téléphones) :
 #   ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS, ANDROID_KEY_PASSWORD
@@ -19,8 +19,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: npm
-      - run: npm ci
+      - run: npm install
       - name: Installateur Windows
         env:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
@@ -39,7 +38,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: npm
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
