@@ -52,11 +52,14 @@ jobs:
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
         run: |
           npm run build
-          # Crée le projet Android s'il n'est pas déjà dans le dépôt
-          [ -d android ] || npx cap add android
+          # Recrée le projet Android s'il est absent OU incomplet (gradlew manquant)
+          if [ ! -f android/gradlew ]; then
+            rm -rf android
+            npx cap add android
+          fi
           npx cap sync android
-          ls -la
-          test -d android
+          ls -la android
+          test -f android/gradlew
       - name: Compilation de l'APK
         env:
           KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
