@@ -15,17 +15,16 @@ jobs:
   windows:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: 20
-          cache: npm
-      - run: npm ci
+      - run: npm install --legacy-peer-deps
       - name: Installateur Windows
         env:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
-        run: npm run electron:build
+        run: npm run electron:build -- --publish never
       - uses: actions/upload-artifact@v4
         with:
           name: installateur-windows
@@ -35,16 +34,26 @@ jobs:
   android:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: 20
-          cache: npm
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: 17
-      - run: npm ci
+      - run: npm install --legacy-peer-deps
+      - name: Application web + synchronisation Android
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+        run: |
+          npm run build
+          # Crée le projet Android s'il n'est pas déjà dans le dépôt
+          [ -d android ] || npx cap add android
+          npx cap sync android
+          ls -la
+          test -d android
       - name: Compilation de l'APK
         env:
           KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
