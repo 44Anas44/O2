@@ -45,13 +45,6 @@ jobs:
           distribution: temurin
           java-version: 17
       - run: npm ci
-      - name: Application web + synchronisation Android
-        env:
-          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
-          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
-        run: |
-          npm run build
-          npx cap sync android
       - name: Compilation de l'APK
         env:
           KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
