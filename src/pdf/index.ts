@@ -1,5 +1,6 @@
 import type { ReportInput } from './report';
 import type { AppointmentSlipInput, SaleReceiptInput } from './receipt';
+import { savePdf } from './save';
 
 /**
  * Les bibliothèques PDF (~400 Ko) ne sont chargées qu'au premier export,
@@ -9,17 +10,17 @@ import type { AppointmentSlipInput, SaleReceiptInput } from './receipt';
 export async function downloadSaleReceipt(input: SaleReceiptInput): Promise<void> {
   const { buildSaleReceipt } = await import('./receipt');
   const { doc, filename } = buildSaleReceipt(input);
-  doc.save(filename);
+  await savePdf(doc, filename);
 }
 
 export async function downloadAppointmentSlip(input: AppointmentSlipInput): Promise<void> {
   const { buildAppointmentSlip } = await import('./receipt');
   const { doc, filename } = buildAppointmentSlip(input);
-  doc.save(filename);
+  await savePdf(doc, filename);
 }
 
 export async function downloadStatsReport(input: ReportInput): Promise<void> {
   const { buildStatsReport } = await import('./report');
   const { doc, filename } = buildStatsReport(input);
-  doc.save(filename);
+  await savePdf(doc, filename);
 }

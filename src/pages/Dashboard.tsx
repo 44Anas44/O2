@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { subDays } from 'date-fns';
-import { PackageIcon, StethoscopeIcon } from 'lucide-react';
+import { PackageIcon, StethoscopeIcon, UsersIcon } from 'lucide-react';
 import type { Period } from '../types';
 import { useStore } from '../contexts/StoreContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -75,9 +75,13 @@ export function Dashboard() {
             Déclarer une vente
           </p>
           <p className="text-sm text-ink-500">
-            Un service crée automatiquement le rendez-vous dans l’agenda.
+            Plusieurs articles sur un seul reçu ; vente par lot avec acheteur et remises.
           </p>
         </div>
+        <Button onClick={() => openSale('lot')} variant="secondary">
+          <UsersIcon className="h-4 w-4" />
+          Vente par lot
+        </Button>
         <Button onClick={() => openSale('produit')} variant="secondary">
           <PackageIcon className="h-4 w-4" />
           Vente de produit

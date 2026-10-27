@@ -75,7 +75,7 @@ $$;
 -- ---------------------------------------------------------------------------
 -- 3. Création automatique du profil à l'inscription
 --    - e-mail invité      -> rejoint le centre de l'invitation avec son rôle
---    - tout premier compte -> administrateur de son propre centre
+--    - aucun administrateur n'existe encore -> administrateur de son propre centre
 --    - autre              -> aucun profil = aucun accès
 -- ---------------------------------------------------------------------------
 
@@ -94,9 +94,12 @@ begin
     insert into profiles (id, owner_id, email, full_name, role)
     values (new.id, inv.owner_id, new.email, inv.full_name, inv.role);
     delete from invitations where id = inv.id;
-  elsif not exists (select 1 from profiles) then
+  elsif not exists (select 1 from profiles where role = 'admin') then
     insert into profiles (id, owner_id, email, full_name, role)
     values (new.id, new.id, new.email, '', 'admin');
+    -- Comptes « en attente » (rattachés à eux-mêmes, non administrateurs, ex. la sauvegarde
+    -- conservée par handover_keep_backup.sql) : ils rejoignent le centre du nouvel administrateur.
+    update profiles set owner_id = new.id where owner_id = id and role <> 'admin';
   end if;
 
   return new;

@@ -14,6 +14,8 @@ import type {
   Expense,
   Product,
   RecurringExpense,
+  Buyer,
+  Receipt,
   Sale,
   ServiceItem } from
 '../types';
@@ -27,24 +29,36 @@ import {
   recurringFromRow,
   recurringToRow,
   saleFromRow,
+  receiptFromRow,
+  buyerFromRow,
   serviceFromRow,
   serviceToRow } from
 '../lib/mappers';
 import { dayKey, monthKey, nowTime, todayKey } from '../utils/date';
 
-export type RecordedSale = {sale: Sale;appointment?: Appointment;};
+export type BasketLine =
+{kind: 'produit';itemId: string;quantity: number;/** Remise en % (vente par lot, rôles autorisés). */discountPct?: number;} |
+{kind: 'service';itemId: string;date: string;time: string;note: string;};
 
-type NewSaleInput = {
-  kind: 'produit' | 'service';
-  itemId: string;
-  quantity: number;
+export type NewBasket = {
   client: string;
-  /** Ventes de produit : date d'encaissement. Services : date du rendez-vous. */
+  phone: string;
+  /** Date d'encaissement du reçu (jour de la vente). */
   date: string;
   time: string;
-  phone?: string;
-  note?: string;
+  lines: BasketLine[];
+  /** Vente par lot : acheteur enregistré obligatoire, produits uniquement. */
+  bulk?: boolean;
+  buyerId?: string;
 };
+
+export type CreatedSale = {
+  receipt: Receipt;
+  sales: Sale[];
+  appointments: Appointment[];
+};
+
+export type CreateSaleResult = {ok: true;result: CreatedSale;} | {ok: false;error: string;};
 
 type StoreValue = {
   loading: boolean;
@@ -67,7 +81,11 @@ type StoreValue = {
   addRecurring: (recurring: Omit<RecurringExpense, 'id' | 'active'>) => Promise<void>;
   toggleRecurring: (id: string) => Promise<void>;
   removeRecurring: (id: string) => Promise<void>;
-  recordSale: (input: NewSaleInput) => Promise<RecordedSale | null>;
+  receipts: Receipt[];
+  buyers: Buyer[];
+  saveBuyer: (input: {id?: string;name: string;company: string;phone: string;}) => Promise<Buyer | null>;
+  removeBuyer: (id: string) => Promise<void>;
+  createSale: (input: NewBasket) => Promise<CreateSaleResult>;
   setAppointmentStatus: (id: string, status: AppointmentStatus) => Promise<void>;
   removeAppointment: (id: string) => Promise<void>;
 };
@@ -122,6 +140,8 @@ export function StoreProvider({ children }: {children: React.ReactNode;}) {
   const [services, setServices] = useState<ServiceItem[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [sales, setSales] = useState<Sale[]>([]);
+  const [receipts, setReceipts] = useState<Receipt[]>([]);
+  const [buyers, setBuyers] = useState<Buyer[]>([]);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [manualExpenses, setManualExpenses] = useState<Expense[]>([]);
   const [recurring, setRecurring] = useState<RecurringExpense[]>([]);
@@ -132,6 +152,8 @@ export function StoreProvider({ children }: {children: React.ReactNode;}) {
   productsRef.current = products;
   const servicesRef = useRef(services);
   servicesRef.current = services;
+  const salesRef = useRef(sales);
+  salesRef.current = sales;
 
   // ---------------------------------------------------------------------
   // Initial load + realtime subscriptions, scoped to the signed-in user
@@ -141,6 +163,8 @@ export function StoreProvider({ children }: {children: React.ReactNode;}) {
       setServices([]);
       setProducts([]);
       setSales([]);
+      setReceipts([]);
+      setBuyers([]);
       setAppointments([]);
       setManualExpenses([]);
       setRecurring([]);
@@ -156,6 +180,8 @@ export function StoreProvider({ children }: {children: React.ReactNode;}) {
       servicesRes,
       productsRes,
       salesRes,
+      receiptsRes,
+      buyersRes,
       appointmentsRes,
       expensesRes,
       recurringRes] =
@@ -163,6 +189,8 @@ export function StoreProvider({ children }: {children: React.ReactNode;}) {
       supabase.from('services').select('*').eq('user_id', userId),
       supabase.from('products').select('*').eq('user_id', userId),
       supabase.from('sales').select('*').eq('user_id', userId).order('date', { ascending: false }),
+      supabase.from('receipts').select('*').eq('user_id', userId).order('date', { ascending: false }),
+      supabase.from('buyers').select('*').eq('user_id', userId),
       supabase.from('appointments').select('*').eq('user_id', userId),
       canFinance ?
       supabase.from('expenses').select('*').eq('user_id', userId) :
@@ -177,6 +205,8 @@ export function StoreProvider({ children }: {children: React.ReactNode;}) {
       setServices((servicesRes.data ?? []).map(serviceFromRow));
       setProducts((productsRes.data ?? []).map(productFromRow));
       setSales((salesRes.data ?? []).map(saleFromRow));
+      setReceipts((receiptsRes.data ?? []).map(receiptFromRow));
+      setBuyers((buyersRes.data ?? []).map(buyerFromRow));
       setAppointments((appointmentsRes.data ?? []).map(appointmentFromRow));
       setManualExpenses((expensesRes.data ?? []).map(expenseFromRow));
       setRecurring((recurringRes.data ?? []).map(recurringFromRow));
@@ -204,6 +234,28 @@ export function StoreProvider({ children }: {children: React.ReactNode;}) {
           setProducts((prev) => prev.filter((item) => item.id !== payload.old.id));
         } else {
           setProducts((prev) => upsertById(prev, productFromRow(payload.new)));
+        }
+      }
+    ).
+    on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'buyers', filter: `user_id=eq.${userId}` },
+      (payload) => {
+        if (payload.eventType === 'DELETE') {
+          setBuyers((prev) => prev.filter((item) => item.id !== payload.old.id));
+        } else {
+          setBuyers((prev) => upsertById(prev, buyerFromRow(payload.new)));
+        }
+      }
+    ).
+    on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'receipts', filter: `user_id=eq.${userId}` },
+      (payload) => {
+        if (payload.eventType === 'DELETE') {
+          setReceipts((prev) => prev.filter((item) => item.id !== payload.old.id));
+        } else {
+          setReceipts((prev) => upsertById(prev, receiptFromRow(payload.new)));
         }
       }
     ).
@@ -450,108 +502,74 @@ export function StoreProvider({ children }: {children: React.ReactNode;}) {
     await supabase.from('recurring_expenses').delete().eq('id', id);
   }, []);
 
-  const recordSale = useCallback(
-    async (input: NewSaleInput): Promise<RecordedSale | null> => {
+  const saveBuyer = useCallback<StoreValue['saveBuyer']>(
+    async (input) => {
       if (!userId) return null;
-
-      if (input.kind === 'produit') {
-        const product = productsRef.current.find((item) => item.id === input.itemId);
-        if (!product) return null;
-        const quantity = Math.max(1, input.quantity);
-        const nextStock = Math.max(0, product.stock - quantity);
-
-        const { data, error } = await supabase.
-        from('sales').
-        insert({
-          user_id: userId,
-          kind: 'produit',
-          item_id: product.id,
-          item_name: product.name,
-          quantity,
-          unit_price: product.salePrice,
-          unit_cost: product.purchasePrice,
-          total: product.salePrice * quantity,
-          profit: (product.salePrice - product.purchasePrice) * quantity,
-          date: input.date,
-          time: input.time || nowTime(),
-          client: input.client || 'Comptoir',
-          created_by_name: displayName
-        }).
-        select().
-        single();
-        if (error || !data) return null;
-
-        // Le stock n'est décrémenté qu'une fois la vente réellement enregistrée.
-        setProducts((prev) =>
-        prev.map((item) => item.id === product.id ? { ...item, stock: nextStock } : item)
-        );
-        await supabase.from('products').update({ stock: nextStock }).eq('id', product.id);
-
-        const sale = saleFromRow(data);
-        setSales((prev) => upsertById(prev, sale));
-        return { sale };
-      }
-
-      const service = servicesRef.current.find((item) => item.id === input.itemId);
-      if (!service) return null;
-
-      const { data: saleRow } = await supabase.
-      from('sales').
-      insert({
-        user_id: userId,
-        kind: 'service',
-        item_id: service.id,
-        item_name: service.name,
-        quantity: 1,
-        unit_price: service.price,
-        unit_cost: 0,
-        total: service.price,
-        profit: service.price,
-        date: input.date,
-        time: input.time || nowTime(),
-        client: input.client || 'Patient',
-        created_by_name: displayName
-      }).
-      select().
-      single();
-      if (!saleRow) return null;
-
-      const { data: appointmentRow } = await supabase.
-      from('appointments').
-      insert({
-        user_id: userId,
-        date: input.date,
-        time: input.time || nowTime(),
-        client: input.client || 'Patient',
-        phone: input.phone ?? '',
-        service_id: service.id,
-        service_name: service.name,
-        duration_min: service.durationMin,
-        status: input.date < dayKey(new Date()) ? 'honoré' : 'prévu',
-        note: input.note ?? '',
-        sale_id: saleRow.id,
-        created_by_name: displayName
-      }).
-      select().
-      single();
-
-      if (appointmentRow) {
-        await supabase.
-        from('sales').
-        update({ appointment_id: appointmentRow.id }).
-        eq('id', saleRow.id);
-        const sale = saleFromRow({ ...saleRow, appointment_id: appointmentRow.id });
-        const appointment = appointmentFromRow(appointmentRow);
-        setSales((prev) => upsertById(prev, sale));
-        setAppointments((prev) => upsertById(prev, appointment));
-        return { sale, appointment };
-      }
-
-      const sale = saleFromRow(saleRow);
-      setSales((prev) => upsertById(prev, sale));
-      return { sale };
+      const row = { name: input.name.trim(), company: input.company.trim(), phone: input.phone.trim() };
+      if (!row.name && !row.company) return null;
+      const query = input.id ?
+      supabase.from('buyers').update(row).eq('id', input.id).select().single() :
+      supabase.from('buyers').insert({ ...row, user_id: userId }).select().single();
+      const { data, error } = await query;
+      if (error || !data) return null;
+      const buyer = buyerFromRow(data);
+      setBuyers((prev) => upsertById(prev, buyer));
+      return buyer;
     },
-    [userId, displayName]
+    [userId]
+  );
+
+  const removeBuyer = useCallback(async (id: string) => {
+    setBuyers((prev) => prev.filter((item) => item.id !== id));
+    await supabase.from('buyers').delete().eq('id', id);
+  }, []);
+
+  const createSale = useCallback(
+    async (input: NewBasket): Promise<CreateSaleResult> => {
+      if (!userId) return { ok: false, error: 'Session invalide.' };
+      if (input.lines.length === 0) return { ok: false, error: 'La vente est vide.' };
+
+      // Tout est enregistré en UNE opération côté base (reçu + lignes + rendez-vous + stock) :
+      // si une ligne échoue, rien n'est enregistré.
+      const { data, error } = await supabase.rpc('create_sale', {
+        p_client: input.client,
+        p_phone: input.phone,
+        p_date: input.date,
+        p_time: input.time || nowTime(),
+        p_today: dayKey(new Date()),
+        p_buyer_id: input.bulk ? input.buyerId ?? null : null,
+        p_bulk: Boolean(input.bulk),
+        p_lines: input.lines.map((line) =>
+        line.kind === 'produit' ?
+        { kind: 'produit', item_id: line.itemId, quantity: line.quantity, discount_pct: line.discountPct ?? 0 } :
+        { kind: 'service', item_id: line.itemId, date: line.date, time: line.time, note: line.note }
+        )
+      });
+      if (error || !data) {
+        return { ok: false, error: error?.message ?? 'Échec de l’enregistrement.' };
+      }
+
+      const result: CreatedSale = {
+        receipt: receiptFromRow(data.receipt),
+        sales: (data.sales ?? []).map(saleFromRow),
+        appointments: (data.appointments ?? []).map(appointmentFromRow)
+      };
+
+      setReceipts((prev) => upsertById(prev, result.receipt));
+      setSales((prev) => result.sales.reduce((list, sale) => upsertById(list, sale), prev));
+      setAppointments((prev) => result.appointments.reduce((list, item) => upsertById(list, item), prev));
+      // Stock : mise à jour immédiate de l'écran (la base l'a déjà décrémenté).
+      setProducts((prev) =>
+      prev.map((product) => {
+        const sold = result.sales.
+        filter((sale) => sale.kind === 'produit' && sale.itemId === product.id).
+        reduce((sum, sale) => sum + sale.quantity, 0);
+        return sold > 0 ? { ...product, stock: Math.max(0, product.stock - sold) } : product;
+      })
+      );
+      return { ok: true, result };
+    },
+    [userId]
   );
 
   const setAppointmentStatus = useCallback(
@@ -565,8 +583,19 @@ export function StoreProvider({ children }: {children: React.ReactNode;}) {
   );
 
   const removeAppointment = useCallback(async (id: string) => {
+    const affected = new Set(
+      salesRef.current.filter((sale) => sale.appointmentId === id).map((sale) => sale.receiptId)
+    );
     setAppointments((prev) => prev.filter((item) => item.id !== id));
     setSales((prev) => prev.filter((sale) => sale.appointmentId !== id));
+    // Un reçu qui n'a plus aucune ligne disparaît (le serveur le supprime aussi).
+    setReceipts((prev) =>
+    prev.filter(
+      (receipt) =>
+      !affected.has(receipt.id) ||
+      salesRef.current.some((sale) => sale.receiptId === receipt.id && sale.appointmentId !== id)
+    )
+    );
     await supabase.from('appointments').delete().eq('id', id);
     await supabase.from('sales').delete().eq('appointment_id', id);
   }, []);
@@ -591,7 +620,11 @@ export function StoreProvider({ children }: {children: React.ReactNode;}) {
       addRecurring,
       toggleRecurring,
       removeRecurring,
-      recordSale,
+      receipts,
+      buyers,
+      saveBuyer,
+      removeBuyer,
+      createSale,
       setAppointmentStatus,
       removeAppointment
     }),
@@ -614,7 +647,11 @@ export function StoreProvider({ children }: {children: React.ReactNode;}) {
     addRecurring,
     toggleRecurring,
     removeRecurring,
-    recordSale,
+    receipts,
+    buyers,
+    saveBuyer,
+    removeBuyer,
+    createSale,
     setAppointmentStatus,
     removeAppointment]
 

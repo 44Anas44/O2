@@ -12,6 +12,8 @@ export type CenterInfo = {
   receiptFooter: string;
   /** Consignes du bon de rendez-vous (une ligne = une puce). */
   appointmentNotes: string[];
+  /** Logo importé dans Paramètres (image PNG en data URL) ; vide = logo par défaut de la marque. */
+  logo: string;
 };
 
 /** Identité (brands.json) : partagée avec les scripts d'empaquetage. */
@@ -39,7 +41,7 @@ export type BrandTheme = {
   /** Arrondi des cartes et boutons. */
   radius: 'soft' | 'sharp';
   /** Valeurs par défaut des coordonnées du centre. */
-  center: Omit<CenterInfo, 'name' | 'tagline'>;
+  center: Omit<CenterInfo, 'name' | 'tagline' | 'logo'>;
 };
 
 export type Brand = BrandIdentity &

@@ -1,8 +1,10 @@
 import type {
   Appointment,
   Expense,
+  Buyer,
   Invitation,
   Profile,
+  Receipt,
   Product,
   RecurringExpense,
   Sale,
@@ -39,7 +41,8 @@ export function productFromRow(row: any): Product {
     salePrice: Number(row.sale_price),
     stock: Number(row.stock),
     minStock: Number(row.min_stock),
-    unit: row.unit
+    unit: row.unit,
+    vat: Boolean(row.vat)
   };
 }
 
@@ -52,6 +55,7 @@ export function productToRow(product: Partial<Product>) {
   if (product.stock !== undefined) row.stock = product.stock;
   if (product.minStock !== undefined) row.min_stock = product.minStock;
   if (product.unit !== undefined) row.unit = product.unit;
+  if (product.vat !== undefined) row.vat = product.vat;
   return row;
 }
 
@@ -70,6 +74,9 @@ export function saleFromRow(row: any): Sale {
     time: row.time,
     client: row.client,
     appointmentId: row.appointment_id ?? undefined,
+    receiptId: row.receipt_id ?? row.id,
+    discountPct: Number(row.discount_pct ?? 0),
+    vatAmount: Number(row.vat_amount ?? 0),
     receiptNo: Number(row.receipt_no ?? 0),
     createdByName: row.created_by_name ?? ''
   };
@@ -145,5 +152,29 @@ export function invitationFromRow(row: any): Invitation {
     fullName: row.full_name ?? '',
     role: row.role,
     createdAt: row.created_at
+  };
+}
+
+export function receiptFromRow(row: any): Receipt {
+  return {
+    id: row.id,
+    receiptNo: Number(row.receipt_no ?? 0),
+    client: row.client ?? '',
+    company: row.company ?? '',
+    phone: row.phone ?? '',
+    date: row.date,
+    time: row.time ?? '',
+    createdByName: row.created_by_name ?? '',
+    buyerId: row.buyer_id ?? undefined,
+    isBulk: Boolean(row.is_bulk)
+  };
+}
+
+export function buyerFromRow(row: any): Buyer {
+  return {
+    id: row.id,
+    name: row.name ?? '',
+    company: row.company ?? '',
+    phone: row.phone ?? ''
   };
 }

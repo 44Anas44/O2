@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { FileTextIcon } from 'lucide-react';
-import type { Appointment, Sale } from '../types';
+import type { Appointment, Receipt } from '../types';
 import { useStore } from '../contexts/StoreContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useSettings } from '../contexts/SettingsContext';
@@ -26,8 +26,8 @@ function useBusy() {
   return { busy, run };
 }
 
-export function SaleReceiptButton({ sale, size = 'sm', variant = 'secondary', label = 'Reçu PDF' }: Props & {sale: Sale;}) {
-  const { appointments } = useStore();
+export function SaleReceiptButton({ receipt, size = 'sm', variant = 'secondary', label = 'Reçu PDF' }: Props & {receipt: Receipt;}) {
+  const { sales, appointments } = useStore();
   const { displayName } = useAuth();
   const { center } = useSettings();
   const { busy, run } = useBusy();
@@ -37,14 +37,16 @@ export function SaleReceiptButton({ sale, size = 'sm', variant = 'secondary', la
       variant={variant}
       disabled={busy}
       onClick={() =>
-      run(() =>
-      downloadSaleReceipt({
-        sale,
-        appointment: appointments.find((a) => a.id === sale.appointmentId) ?? null,
-        center,
-        generatedBy: displayName
+      run(() => {
+        const lines = sales.filter((sale) => sale.receiptId === receipt.id);
+        return downloadSaleReceipt({
+          receipt,
+          lines,
+          appointments: appointments.filter((item) => lines.some((line) => line.appointmentId === item.id)),
+          center,
+          generatedBy: displayName
+        });
       })
-      )
       }>
       <FileTextIcon className="h-4 w-4" />
       {label}

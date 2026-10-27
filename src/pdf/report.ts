@@ -132,6 +132,21 @@ export function buildStatsReport(input: ReportInput): BuiltPdf {
     3
   );
 
+  // TVA collectée et remises accordées (si la période en contient).
+  const vatCollected = sum(sales, (sale) => sale.vatAmount);
+  const discountsGiven = sum(sales, (sale) => Math.max(0, sale.unitPrice * sale.quantity - sale.total));
+  if (vatCollected > 0 || discountsGiven > 0) {
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    setText(doc, COLORS.ink500);
+    const parts = [
+    vatCollected > 0 ? `dont TVA collectée : ${pdfMoney(vatCollected)} (reversée, exclue du profit)` : '',
+    discountsGiven > 0 ? `remises accordées : ${pdfMoney(discountsGiven)}` : ''].
+    filter(Boolean);
+    doc.text(clean(parts.join('   ·   ')), M, y - 2);
+    y += 4;
+  }
+
   /* ------------------------ Services vs produits ------------------------ */
   y = ensureSpace(ctx, y, 48);
   y = sectionTitle(ctx, y, 'Répartition services / produits') + 2;

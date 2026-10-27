@@ -278,6 +278,7 @@ export function Expenses() {
             <Field label="Montant (TND)">
               <input
                 type="number"
+                step="any"
                 min={0}
                 className={inputClass}
                 value={form.amount}
@@ -374,6 +375,7 @@ export function Expenses() {
             <Field label="Montant (TND)">
               <input
                 type="number"
+                step="any"
                 min={0}
                 className={inputClass}
                 value={ruleForm.amount}

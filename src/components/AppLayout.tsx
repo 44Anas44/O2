@@ -2,6 +2,7 @@ import React from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { LogOutIcon,
   BanknoteIcon,
+  BriefcaseIcon,
   CalendarDaysIcon,
   CalendarRangeIcon,
   LayoutDashboardIcon,
@@ -22,6 +23,7 @@ import { fmtLongDate, todayKey } from '../utils/date';
 import { ROLE_LABELS, type Permission } from '../lib/permissions';
 import { BRAND } from '../brand';
 import { BrandLogo } from '../brand/BrandLogo';
+import { useSettings } from '../contexts/SettingsContext';
 
 const dark = BRAND.sidebar === 'dark';
 const sb = dark ?
@@ -51,6 +53,7 @@ const sb = dark ?
 const allNavItems: {to: string;label: string;icon: typeof LayoutDashboardIcon;permission?: Permission;}[] = [
 { to: '/', label: 'Accueil', icon: LayoutDashboardIcon },
 { to: '/ventes', label: 'Ventes', icon: ReceiptIcon, permission: 'sales.view' },
+{ to: '/acheteurs', label: 'Acheteurs', icon: BriefcaseIcon, permission: 'sales.create' },
 { to: '/services', label: 'Services', icon: StethoscopeIcon },
 { to: '/produits', label: 'Produits & stock', icon: PackageIcon },
 { to: '/depenses', label: 'Dépenses', icon: BanknoteIcon, permission: 'expenses.manage' },
@@ -65,6 +68,7 @@ export function AppLayout() {
   const { lowStock, appointments } = useStore();
   const { openSale } = useSaleDialog();
   const { signOut, displayName, role, can } = useAuth();
+  const { center } = useSettings();
   const navItems = allNavItems.filter((item) => !item.permission || can(item.permission));
   const location = useLocation();
 
@@ -80,7 +84,7 @@ export function AppLayout() {
     <div className="flex min-h-screen w-full bg-ink-50/60">
       <aside className={`hidden w-64 shrink-0 flex-col border-r lg:flex ${sb.aside}`}>
         <div className="flex items-center gap-3 px-5 py-6">
-          <BrandLogo size={42} />
+          <BrandLogo size={42} src={center.logo || undefined} />
           <span className="leading-tight">
             <span className={`block text-sm font-semibold ${sb.name}`}>
               {BRAND.name}
@@ -135,7 +139,7 @@ export function AppLayout() {
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-30 border-b border-ink-100 bg-white/90 backdrop-blur">
+        <header className="sticky top-0 z-30 border-b border-ink-100 bg-white/90 pt-[env(safe-area-inset-top)] backdrop-blur">
           <div className="flex items-center justify-between gap-4 px-4 py-3.5 sm:px-6">
             <div className="min-w-0">
               <h1 className="truncate text-lg font-semibold text-ink-900">
@@ -145,7 +149,7 @@ export function AppLayout() {
                 {fmtLongDate(todayKey())}
               </p>
             </div>
-            <Button onClick={() => openSale('produit')} className="shrink-0">
+            <Button onClick={() => openSale()} className="shrink-0">
               <PlusIcon className="h-4 w-4" />
               <span className="hidden sm:inline">Déclarer une vente</span>
               <span className="sm:hidden">Vente</span>
@@ -174,7 +178,7 @@ export function AppLayout() {
             </span>
           </nav>
         </header>
-        <main className="flex-1 px-4 py-6 sm:px-6">
+        <main className="flex-1 px-4 pb-[calc(1.5rem+env(safe-area-inset-bottom))] pt-6 sm:px-6">
           <Outlet />
         </main>
       </div>

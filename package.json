@@ -1,6 +1,7 @@
 {
   "name": "centre2-manager",
-  "version": "0.1.0",
+  "appId": "com.centre2.manager",
+  "version": "1.0.0",
   "private": true,
   "type": "module",
   "main": "electron/main.cjs",
@@ -10,15 +11,19 @@
     "lint": "eslint . --ext .js,.jsx,.ts,.tsx",
     "preview": "npx vite preview",
     "electron:dev": "concurrently -k \"npx vite\" \"wait-on http://localhost:5173 && electron .\"",
-    "electron:build": "npm run build && electron-builder",
+    "electron:build": "npm run build && electron-builder --win --publish never",
     "cap:sync": "npm run build && npx cap sync",
     "cap:android": "npm run cap:sync && npx cap open android",
-    "cap:ios": "npm run cap:sync && npx cap open ios"
+    "cap:ios": "npm run cap:sync && npx cap open ios",
+    "cap:assets": "capacitor-assets generate --android --assetPath assets"
   },
   "devDependencies": {
     "@capacitor/android": "^6.2.0",
+    "@capacitor/assets": "^3.0.5",
     "@capacitor/cli": "^6.2.0",
     "@capacitor/ios": "^6.2.0",
+    "@emotion/react": "^11.13.3",
+    "@supabase/supabase-js": "^2.112.4",
     "@types/node": "^20.11.18",
     "@types/react": "^18.3.1",
     "@types/react-dom": "^18.3.1",
@@ -27,12 +32,21 @@
     "@vitejs/plugin-react": "^4.2.1",
     "autoprefixer": "latest",
     "concurrently": "^9.1.0",
+    "date-fns": "^4.0.0",
     "electron": "^33.4.11",
     "electron-builder": "^25.1.8",
     "eslint": "^8.50.0",
     "eslint-plugin-react-hooks": "^4.6.0",
     "eslint-plugin-react-refresh": "^0.4.1",
+    "framer-motion": "^11.5.4",
+    "jspdf": "^4.2.1",
+    "jspdf-autotable": "^5.0.8",
+    "lucide-react": "0.522.0",
+    "pdfjs-dist": "^3.11.174",
     "postcss": "latest",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^6.26.2",
     "tailwindcss": "3.4.17",
     "typescript": "^5.5.4",
     "vite": "^5.2.0",
@@ -40,36 +54,55 @@
   },
   "dependencies": {
     "@capacitor/core": "^6.2.0",
-    "@emotion/react": "^11.13.3",
-    "@supabase/supabase-js": "^2.112.4",
-    "date-fns": "^4.0.0",
-    "framer-motion": "^11.5.4",
-    "jspdf": "^4.2.1",
-    "jspdf-autotable": "^5.0.8",
-    "lucide-react": "0.522.0",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
-    "react-router-dom": "^6.26.2"
+    "@capacitor/filesystem": "^6.0.4",
+    "@capacitor/share": "^6.0.4",
+    "@capacitor/splash-screen": "^6.0.4",
+    "@capacitor/status-bar": "^6.0.3"
   },
   "build": {
     "appId": "com.centre2.manager",
     "productName": "Centre 2 Manager",
     "directories": {
-      "output": "release"
+      "output": "release",
+      "buildResources": "build"
     },
     "files": [
       "dist/**/*",
-      "electron/**/*"
+      "electron/**/*",
+      "package.json"
     ],
     "mac": {
       "category": "public.app-category.business"
     },
     "win": {
-      "target": "nsis"
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.png"
     },
     "linux": {
       "target": "AppImage",
-      "category": "Office"
-    }
-  }
+      "category": "Office",
+      "icon": "build/icon.png"
+    },
+    "artifactName": "${productName}-Setup-${version}.${ext}",
+    "asar": true,
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "language": "1036",
+      "deleteAppDataOnUninstall": false
+    },
+    "npmRebuild": false
+  },
+  "description": "Centre 2 Manager - gestion de centre (ventes, stock, rendez-vous)",
+  "author": "Centre"
 }

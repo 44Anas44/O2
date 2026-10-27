@@ -1,8 +1,10 @@
-import React, { useEffect, useState } from 'react';
-import { CheckIcon } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
+import { CheckIcon, ImageIcon, Trash2Icon, UploadIcon } from 'lucide-react';
 import { useSettings } from '../contexts/SettingsContext';
 import type { CenterInfo } from '../config/center';
 import { Button, Field, Panel, PanelHeader, inputClass } from '../components/ui/Primitives';
+import { BrandLogo } from '../brand/BrandLogo';
+import { fileToLogoDataUrl, LOGO_ACCEPT } from '../utils/image';
 
 export function Settings() {
   const { center, save } = useSettings();
@@ -10,6 +12,9 @@ export function Settings() {
   const [notes, setNotes] = useState(center.appointmentNotes.join('\n'));
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ok: boolean;text: string;} | null>(null);
+  const [logoBusy, setLogoBusy] = useState(false);
+  const [logoMessage, setLogoMessage] = useState<{ok: boolean;text: string;} | null>(null);
+  const fileInput = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     setForm(center);
@@ -18,6 +23,28 @@ export function Settings() {
 
   const set = (key: keyof CenterInfo) => (event: React.ChangeEvent<HTMLInputElement>) =>
   setForm({ ...form, [key]: event.target.value });
+
+  const changeLogo = async (logo: string) => {
+    setLogoBusy(true);
+    setLogoMessage(null);
+    // Seul le logo change : on réutilise les coordonnées déjà enregistrées.
+    const error = await save({ ...center, logo });
+    setLogoBusy(false);
+    setLogoMessage(error ?
+    { ok: false, text: `Échec de l’enregistrement : ${error}` } :
+    { ok: true, text: logo ? 'Logo enregistré. Il apparaît dans le menu et sur tous les PDF.' : 'Logo par défaut rétabli.' });
+  };
+
+  const onFile = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+    try {
+      await changeLogo(await fileToLogoDataUrl(file));
+    } catch (error) {
+      setLogoMessage({ ok: false, text: error instanceof Error ? error.message : 'Image refusée.' });
+    }
+  };
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -34,7 +61,45 @@ export function Settings() {
   };
 
   return (
-    <div className="mx-auto max-w-3xl">
+    <div className="mx-auto flex max-w-3xl flex-col gap-6">
+      <Panel>
+        <PanelHeader
+          title="Logo"
+          subtitle="Affiché dans le menu et en en-tête de tous les reçus, bons de rendez-vous et rapports." />
+        <div className="flex flex-wrap items-center gap-6 px-5 py-5">
+          <div className="flex items-center gap-3">
+            <span className="flex h-24 w-40 items-center justify-center rounded-lg border border-ink-200 bg-white p-3">
+              <BrandLogo size={64} src={center.logo || undefined} />
+            </span>
+            <span className="flex h-24 w-40 items-center justify-center rounded-lg bg-ink-900 p-3">
+              <BrandLogo size={64} src={center.logo || undefined} />
+            </span>
+          </div>
+          <div className="min-w-[220px] flex-1 space-y-3">
+            <p className="text-sm text-ink-600">
+              {center.logo ? 'Logo personnalisé en place.' : 'Logo par défaut de l’application.'}{' '}
+              PNG à fond transparent recommandé (JPG, WebP et SVG acceptés), carré ou horizontal.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <input ref={fileInput} type="file" accept={LOGO_ACCEPT} className="hidden" onChange={onFile} />
+              <Button type="button" disabled={logoBusy} onClick={() => fileInput.current?.click()}>
+                {center.logo ? <ImageIcon className="h-4 w-4" /> : <UploadIcon className="h-4 w-4" />}
+                {logoBusy ? 'Enregistrement…' : center.logo ? 'Changer le logo' : 'Importer un logo'}
+              </Button>
+              {center.logo ?
+              <Button type="button" variant="secondary" disabled={logoBusy} onClick={() => changeLogo('')}>
+                  <Trash2Icon className="h-4 w-4" />
+                  Revenir au logo par défaut
+                </Button> : null}
+            </div>
+            {logoMessage ?
+            <p className={`rounded-lg px-3 py-2 text-sm ${logoMessage.ok ? 'bg-brand-50 text-brand-800' : 'bg-red-50 text-red-600'}`}>
+                {logoMessage.text}
+              </p> : null}
+          </div>
+        </div>
+      </Panel>
+
       <Panel>
         <PanelHeader
           title="Informations du centre"

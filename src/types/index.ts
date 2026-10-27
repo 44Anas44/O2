@@ -16,6 +16,8 @@ export type Product = {
   stock: number;
   minStock: number;
   unit: string;
+  /** TVA 19 % applicable : le prix de vente saisi est alors HT, le client paie HT x 1,19. */
+  vat: boolean;
 };
 
 export type ExpenseCategory =
@@ -70,6 +72,12 @@ export type Sale = {
   client: string;
   appointmentId?: string;
   /** Numéro de reçu séquentiel (attribué par la base de données). */
+  /** Reçu auquel appartient cette ligne (un reçu = plusieurs lignes). */
+  receiptId: string;
+  /** Remise accordée sur la ligne (en %), vente par lot. */
+  discountPct: number;
+  /** TVA incluse dans le total de la ligne. */
+  vatAmount: number;
   receiptNo: number;
   /** Nom de la personne qui a enregistré la vente. */
   createdByName: string;
@@ -114,4 +122,28 @@ export type Invitation = {
   fullName: string;
   role: Role;
   createdAt: string;
+};
+
+/** Un reçu : un numéro, un client, une date ; regroupe une ou plusieurs lignes de vente. */
+export type Receipt = {
+  id: string;
+  receiptNo: number;
+  client: string;
+  /** Société de l'acheteur (vente par lot). */
+  company: string;
+  phone: string;
+  date: string;
+  time: string;
+  createdByName: string;
+  buyerId?: string;
+  /** Vente par lot : acheteur enregistré, remises possibles. */
+  isBulk: boolean;
+};
+
+/** Acheteur enregistré (clients de ventes par lot) : nom et/ou société. */
+export type Buyer = {
+  id: string;
+  name: string;
+  company: string;
+  phone: string;
 };

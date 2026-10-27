@@ -4,6 +4,7 @@ export type Permission =
 'sales.create' |
 'sales.view' |
 'sales.delete' |
+'sales.discount' |
 'appointments.manage' |
 'appointments.delete' |
 'catalog.edit' |
@@ -19,6 +20,7 @@ const ALL: Permission[] = [
 'sales.create',
 'sales.view',
 'sales.delete',
+'sales.discount',
 'appointments.manage',
 'appointments.delete',
 'catalog.edit',

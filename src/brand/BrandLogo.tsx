@@ -2,11 +2,12 @@ import React from 'react';
 import { BRAND } from './index';
 
 /** Logo de la marque : image si fournie, sinon monogramme (initiales). */
-export function BrandLogo({ size = 36, className = '' }: {size?: number;className?: string;}) {
-  if (BRAND.logo) {
+export function BrandLogo({ size = 36, className = '', src }: {size?: number;className?: string;src?: string;}) {
+  const image = src || BRAND.logo;
+  if (image) {
     return (
       <img
-        src={BRAND.logo}
+        src={image}
         alt={BRAND.name}
         style={{ height: size, maxWidth: size * 3 }}
         className={`w-auto object-contain ${className}`} />);

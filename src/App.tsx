@@ -14,6 +14,7 @@ import { Expenses } from './pages/Expenses';
 import { Agenda } from './pages/Agenda';
 import { TodayAppointments } from './pages/TodayAppointments';
 import { Sales } from './pages/Sales';
+import { Buyers } from './pages/Buyers';
 import { Reports } from './pages/Reports';
 import { Team } from './pages/Team';
 import type { Permission } from './lib/permissions';
@@ -76,6 +77,7 @@ export function App() {
                 <Route element={<AppLayout />}>
                   <Route path="/" element={<Dashboard />} />
                   <Route path="/ventes" element={<Guard permission="sales.view"><Sales /></Guard>} />
+                  <Route path="/acheteurs" element={<Guard permission="sales.create"><Buyers /></Guard>} />
                   <Route path="/services" element={<Services />} />
                   <Route path="/produits" element={<Products />} />
                   <Route path="/depenses" element={<Guard permission="expenses.manage"><Expenses /></Guard>} />

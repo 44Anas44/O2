@@ -3,6 +3,8 @@ import { PencilIcon, PlusIcon, StethoscopeIcon, Trash2Icon } from 'lucide-react'
 import type { ServiceItem } from '../types';
 import { useStore } from '../contexts/StoreContext';
 import { useAuth } from '../contexts/AuthContext';
+import { SearchBox } from '../components/sale/SearchBox';
+import { filterBySearch } from '../utils/search';
 import { Modal } from '../components/ui/Modal';
 import {
   Badge,
@@ -27,6 +29,7 @@ export function Services() {
   const { services, saveService, removeService, sales } = useStore();
   const { can } = useAuth();
   const canEdit = can('catalog.edit');
+  const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<ServiceItem | null>(null);
   const [form, setForm] = useState(emptyForm);
@@ -71,11 +74,18 @@ export function Services() {
         <PanelHeader
           title="Services du cabinet"
           subtitle={`${services.length} services déclarés · ${services.filter((s) => s.active).length} actifs`}
-          action={canEdit ?
-          <Button onClick={startCreate}>
-              <PlusIcon className="h-4 w-4" />
-              Nouveau service
-            </Button> : undefined} />
+          action={
+          <div className="flex flex-wrap items-center gap-2">
+              <div className="w-64">
+                <SearchBox value={query} onChange={setQuery} placeholder="Rechercher un service…" />
+              </div>
+              {canEdit ?
+            <Button onClick={startCreate}>
+                  <PlusIcon className="h-4 w-4" />
+                  Nouveau service
+                </Button> : null}
+            </div>
+          } />
         
         {services.length === 0 ?
         <EmptyState
@@ -97,7 +107,7 @@ export function Services() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-ink-100">
-                {services.map((service) =>
+                {filterBySearch(services, query, (item) => item.name, (item) => item.category).map((service) =>
               <tr key={service.id} className="align-middle">
                     <td className="px-5 py-3.5">
                       <p className="font-medium text-ink-900">{service.name}</p>
@@ -193,6 +203,7 @@ export function Services() {
             <Field label="Prix (TND)">
               <input
                 type="number"
+                step="any"
                 min={0}
                 className={inputClass}
                 value={form.price}

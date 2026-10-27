@@ -60,11 +60,12 @@ export function setText(doc: jsPDF, color: RGB) {
 /** Logo (image de la marque) ou monogramme ; retourne la largeur occupée (mm). */
 function drawLogo(ctx: DocContext, x: number, y: number, height: number): number {
   const { doc } = ctx;
-  if (BRAND.logo) {
+  const logo = ctx.center.logo || BRAND.logo;
+  if (logo) {
     try {
-      const props = doc.getImageProperties(BRAND.logo);
+      const props = doc.getImageProperties(logo);
       const width = Math.min(height * (props.width / props.height), 34);
-      doc.addImage(BRAND.logo, 'PNG', x, y, width, width * (props.height / props.width));
+      doc.addImage(logo, 'PNG', x, y, width, width * (props.height / props.width));
       return width;
     } catch {
       // image illisible : on retombe sur le monogramme
@@ -502,9 +503,15 @@ parts: {label: string;value: number;color: RGB;}[])
 }
 
 /** Cadre vide « Cachet et signature ». */
-export function signatureBox(ctx: DocContext, y: number, width = 56, height = 26): number {
+export function signatureBox(
+ctx: DocContext,
+y: number,
+width = 56,
+height = 26,
+align: 'left' | 'right' = 'right')
+: number {
   const { doc, W, M } = ctx;
-  const x = W - M - width;
+  const x = align === 'right' ? W - M - width : M;
   setStroke(doc, COLORS.ink200);
   doc.setLineWidth(0.3);
   doc.roundedRect(x, y, width, height, 2, 2, 'D');

@@ -10,5 +10,6 @@ export type { CenterInfo };
 export const DEFAULT_CENTER: CenterInfo = {
   name: BRAND.name,
   tagline: BRAND.tagline,
-  ...BRAND.center
+  ...BRAND.center,
+  logo: ''
 };

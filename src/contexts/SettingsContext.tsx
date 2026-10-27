@@ -26,7 +26,8 @@ function fromRow(row: any): CenterInfo {
     email: row.email ?? '',
     taxId: row.tax_id ?? '',
     receiptFooter: row.receipt_footer ?? '',
-    appointmentNotes: notes
+    appointmentNotes: notes,
+    logo: row.logo_data ?? ''
   };
 }
 
@@ -68,6 +69,7 @@ export function SettingsProvider({ children }: {children: React.ReactNode;}) {
         tax_id: info.taxId.trim(),
         receipt_footer: info.receiptFooter.trim(),
         appointment_notes: info.appointmentNotes.join('\n'),
+        logo_data: info.logo,
         updated_at: new Date().toISOString()
       });
       if (error) return error.message;

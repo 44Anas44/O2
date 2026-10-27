@@ -10,6 +10,8 @@ import {
 import type { Product } from '../types';
 import { useStore } from '../contexts/StoreContext';
 import { useAuth } from '../contexts/AuthContext';
+import { SearchBox } from '../components/sale/SearchBox';
+import { filterBySearch } from '../utils/search';
 import { Modal } from '../components/ui/Modal';
 import {
   Badge,
@@ -21,6 +23,7 @@ import {
   inputClass } from
 '../components/ui/Primitives';
 import { money, percent } from '../utils/format';
+import { unitPrice, VAT_RATE } from '../lib/pricing';
 
 const emptyForm = {
   name: '',
@@ -29,7 +32,8 @@ const emptyForm = {
   salePrice: 0,
   stock: 0,
   minStock: 5,
-  unit: 'boîte'
+  unit: 'boîte',
+  vat: false
 };
 
 export function Products() {
@@ -37,6 +41,7 @@ export function Products() {
   const { can } = useAuth();
   const canEdit = can('catalog.edit');
   const showCosts = can('costs.view');
+  const [query, setQuery] = useState('');
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<Product | null>(null);
   const [form, setForm] = useState(emptyForm);
@@ -59,7 +64,8 @@ export function Products() {
       salePrice: product.salePrice,
       stock: product.stock,
       minStock: product.minStock,
-      unit: product.unit
+      unit: product.unit,
+      vat: product.vat
     });
     setFormOpen(true);
   };
@@ -98,11 +104,18 @@ export function Products() {
         <PanelHeader
           title="Produits & stock"
           subtitle={showCosts ? `${products.length} références · valeur du stock ${money(stockValue)}` : `${products.length} références`}
-          action={canEdit ?
-          <Button onClick={startCreate}>
-              <PlusIcon className="h-4 w-4" />
-              Nouveau produit
-            </Button> : undefined} />
+          action={
+          <div className="flex flex-wrap items-center gap-2">
+              <div className="w-64">
+                <SearchBox value={query} onChange={setQuery} placeholder="Rechercher un produit…" />
+              </div>
+              {canEdit ?
+            <Button onClick={startCreate}>
+                  <PlusIcon className="h-4 w-4" />
+                  Nouveau produit
+                </Button> : null}
+            </div>
+          } />
         
         {products.length === 0 ?
         <EmptyState
@@ -125,7 +138,7 @@ export function Products() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-ink-100">
-                {products.map((product) => {
+                {filterBySearch(products, query, (item) => item.name, (item) => item.category).map((product) => {
                 const unitMargin = product.salePrice - product.purchasePrice;
                 const alert = product.stock <= product.minStock;
                 return (
@@ -141,7 +154,11 @@ export function Products() {
                         {money(product.purchasePrice)}
                       </td> : null}
                       <td className="px-5 py-3.5 text-right font-semibold text-ink-900">
-                        {money(product.salePrice)}
+                        {money(unitPrice(product))}
+                        {product.vat ?
+                        <span className="ml-1.5 rounded bg-brand-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-brand-700" title={`Prix saisi ${money(product.salePrice)} HT + TVA ${Math.round(VAT_RATE * 100)} %`}>
+                            TVA
+                          </span> : null}
                       </td>
                       {showCosts ?
                       <td className="px-5 py-3.5 text-right text-ink-600">
@@ -253,6 +270,7 @@ export function Products() {
             <Field label="Prix d’achat (TND)">
               <input
                 type="number"
+                step="any"
                 min={0}
                 className={inputClass}
                 value={form.purchasePrice}
@@ -262,9 +280,10 @@ export function Products() {
                 required />
               
             </Field>
-            <Field label="Prix de vente (TND)">
+            <Field label={form.vat ? 'Prix de vente HT (TND)' : 'Prix de vente (TND)'}>
               <input
                 type="number"
+                step="any"
                 min={0}
                 className={inputClass}
                 value={form.salePrice}
@@ -274,6 +293,25 @@ export function Products() {
                 required />
               
             </Field>
+            <div className="sm:col-span-2 flex items-center justify-between gap-4 rounded-lg border border-ink-200 bg-ink-50 px-4 py-3">
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-ink-900">TVA {Math.round(VAT_RATE * 100)} %</p>
+                <p className="text-xs text-ink-500">
+                  {form.vat ?
+                  `Le client paie le prix HT × ${1 + VAT_RATE} : ${money(unitPrice({ salePrice: form.salePrice, vat: true }))} TTC.` :
+                  'Désactivée : le prix de vente saisi est le prix payé par le client.'}
+                </p>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={form.vat}
+                aria-label="TVA applicable"
+                onClick={() => setForm({ ...form, vat: !form.vat })}
+                className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${form.vat ? 'bg-brand-600' : 'bg-ink-300'}`}>
+                <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all ${form.vat ? 'left-[22px]' : 'left-0.5'}`} />
+              </button>
+            </div>
             <Field
               label="Stock"
               hint="Une augmentation ici est enregistrée en dépense.">
