@@ -42,7 +42,10 @@ jobs:
         with:
           distribution: temurin
           java-version: 17
-      - run: npm install --legacy-peer-deps
+      - run: |
+          rm -rf node_modules
+          npm install --legacy-peer-deps
+          chmod -R +x node_modules/.bin
       - name: Application web + synchronisation Android
         env:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
