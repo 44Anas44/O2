@@ -61,7 +61,7 @@
   },
   "build": {
     "appId": "com.centre2.manager",
-    "productName": "Centre 2 Manager",
+    "productName": "Kassab Center Manager",
     "directories": {
       "output": "release",
       "buildResources": "build"
