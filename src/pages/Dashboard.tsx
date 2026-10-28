@@ -20,7 +20,8 @@ import { dayKey, fmtDayLabel, rangeFor, todayKey } from '../utils/date';
 import { money } from '../utils/format';
 
 export function Dashboard() {
-  const { sales, expenses, appointments, services, lowStock } = useStore();
+  // `countedSales` : sans les services annulés ni les services non payés pas encore honorés.
+  const { countedSales: sales, expenses, appointments, services, lowStock } = useStore();
   const { can } = useAuth();
   const showFinance = can('finance.view');
   const { openSale } = useSaleDialog();

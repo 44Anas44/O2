@@ -18,18 +18,19 @@ import { useSettings } from '../contexts/SettingsContext';
 import { downloadAppointmentSlip, downloadSaleReceipt } from '../pdf';
 import { receiptNumber } from '../pdf/theme';
 import { Modal } from './ui/Modal';
-import { Button, Field, inputClass } from './ui/Primitives';
+import { Badge, Button, Field, inputClass } from './ui/Primitives';
 import { ProductPicker } from './sale/ProductPicker';
 import { ServicePicker } from './sale/ServicePicker';
 import { ServiceForm } from './sale/ServiceForm';
 import { BuyerPicker, buyerLabel } from './sale/BuyerPicker';
 import { lineAmounts } from '../lib/pricing';
+import { hasReceiptNo, isPaidAtBooking } from '../utils/saleAccounting';
 import { money } from '../utils/format';
 import { fmtShortDate, nowTime, todayKey } from '../utils/date';
 
 type ProductLine = {key: string;kind: 'produit';itemId: string;quantity: number;discountPct: number;};
 type Mode = 'standard' | 'lot';
-type ServiceLine = {key: string;kind: 'service';itemId: string;date: string;time: string;note: string;};
+type ServiceLine = {key: string;kind: 'service';itemId: string;date: string;time: string;note: string;paid: boolean;};
 type Line = ProductLine | ServiceLine;
 
 type View =
@@ -129,7 +130,7 @@ export function SaleDialogProvider({ children }: {children: React.ReactNode;}) {
 
   const removeLine = (key: string) => setLines((prev) => prev.filter((line) => line.key !== key));
 
-  const saveService = (itemId: string, editKey: string | undefined, form: {date: string;time: string;note: string;}) => {
+  const saveService = (itemId: string, editKey: string | undefined, form: {date: string;time: string;note: string;paid: boolean;}) => {
     setLines((prev) =>
     editKey ?
     prev.map((line) => line.key === editKey && line.kind === 'service' ? { ...line, ...form } : line) :
@@ -162,7 +163,12 @@ export function SaleDialogProvider({ children }: {children: React.ReactNode;}) {
     { gross: 0, discount: 0, total: 0, vat: 0, profit: 0 }
   );
   const total = totals.total;
-  const profit = totals.profit;
+  // Un service « à payer le jour du RDV » n'est pas encaissé maintenant : il n'est ni sur le reçu,
+  // ni dans le total du jour (il sera compté à la date du rendez-vous, une fois honoré).
+  const deferred = (line: Line) => line.kind === 'service' && !line.paid;
+  const payNow = lines.reduce((sum, line) => deferred(line) ? sum : sum + amountsOf(line).total, 0);
+  const payLater = lines.reduce((sum, line) => deferred(line) ? sum + amountsOf(line).total : sum, 0);
+  const profit = lines.reduce((sum, line) => deferred(line) ? sum : sum + amountsOf(line).profit, 0);
   const hasProducts = lines.some((line) => line.kind === 'produit');
   const hasServices = lines.some((line) => line.kind === 'service');
 
@@ -210,7 +216,7 @@ export function SaleDialogProvider({ children }: {children: React.ReactNode;}) {
       lines: lines.map((line) =>
       line.kind === 'produit' ?
       { kind: 'produit', itemId: line.itemId, quantity: line.quantity, discountPct: line.discountPct } :
-      { kind: 'service', itemId: line.itemId, date: line.date, time: line.time, note: line.note }
+      { kind: 'service', itemId: line.itemId, date: line.date, time: line.time, note: line.note, paid: line.paid }
       )
     });
     setSaving(false);
@@ -244,6 +250,13 @@ export function SaleDialogProvider({ children }: {children: React.ReactNode;}) {
   };
 
   /* ----------------------------- rendu ----------------------------- */
+
+  // Reçu : produits + services payés à la réservation. Bon de rendez-vous : services non payés.
+  const paidDone = done ? done.sales.filter(isPaidAtBooking) : [];
+  const unpaidDone = done ? done.sales.filter((sale) => !isPaidAtBooking(sale)) : [];
+  const unpaidAppointments = done ?
+  done.appointments.filter((appointment) => unpaidDone.some((sale) => sale.appointmentId === appointment.id)) :
+  [];
 
   const count = lines.length;
   const summary =
@@ -287,22 +300,35 @@ export function SaleDialogProvider({ children }: {children: React.ReactNode;}) {
             <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-brand-50 text-brand-700">
               <CheckIcon className="h-6 w-6" />
             </span>
-            <div>
-              <p className="text-base font-semibold text-ink-900">Reçu {receiptNumber(done.receipt.receiptNo)}</p>
-              <p className="text-sm text-ink-500">
-                {done.sales.length} article{done.sales.length > 1 ? 's' : ''} ·{' '}
-                {money(done.sales.reduce((sum, sale) => sum + sale.total, 0))}
-              </p>
+            {done.warning ?
+            <p className="rounded-lg bg-red-50 px-3 py-2 text-left text-sm text-red-700">{done.warning}</p> : null}
+            <div className="space-y-1">
+              {hasReceiptNo(done.receipt.receiptNo) ?
+            <>
+                  <p className="text-base font-semibold text-ink-900">Reçu {receiptNumber(done.receipt.receiptNo)}</p>
+                  <p className="text-sm text-ink-500">
+                    {paidDone.length} article{paidDone.length > 1 ? 's' : ''} · {money(paidDone.reduce((sum, sale) => sum + sale.total, 0))}
+                  </p>
+                </> :
+            <>
+                  <p className="text-base font-semibold text-ink-900">Rendez-vous enregistré{unpaidDone.length > 1 ? 's' : ''}</p>
+                  <p className="text-sm text-ink-500">Aucun paiement encaissé : remettez le bon de rendez-vous au client.</p>
+                </>}
+              {unpaidDone.length > 0 ?
+            <p className="text-sm font-medium text-amber-700">
+                  À régler le jour du rendez-vous : {money(unpaidDone.reduce((sum, sale) => sum + sale.total, 0))}
+                </p> : null}
             </div>
             <div className="flex flex-wrap justify-center gap-2">
-              <Button type="button" onClick={printReceipt}>
-                <FileTextIcon className="h-4 w-4" />
-                Télécharger le reçu (PDF)
-              </Button>
-              {done.appointments.map((appointment) =>
-            <Button key={appointment.id} type="button" variant="secondary" onClick={() => printSlip(appointment.id)}>
+              {hasReceiptNo(done.receipt.receiptNo) && paidDone.length > 0 ?
+            <Button type="button" onClick={printReceipt}>
+                  <FileTextIcon className="h-4 w-4" />
+                  Télécharger le reçu (PDF)
+                </Button> : null}
+              {unpaidAppointments.map((appointment) =>
+            <Button key={appointment.id} type="button" variant={hasReceiptNo(done.receipt.receiptNo) ? 'secondary' : 'primary'} onClick={() => printSlip(appointment.id)}>
                   <CalendarClockIcon className="h-4 w-4" />
-                  Bon RDV · {appointment.serviceName} ({fmtShortDate(appointment.date)})
+                  Bon de RDV · {appointment.serviceName} ({fmtShortDate(appointment.date)})
                 </Button>
             )}
             </div>
@@ -336,7 +362,8 @@ export function SaleDialogProvider({ children }: {children: React.ReactNode;}) {
           initial={{
             date: formLine?.date ?? todayKey(),
             time: formLine?.time ?? nowTime(),
-            note: formLine?.note ?? ''
+            note: formLine?.note ?? '',
+            paid: formLine?.paid ?? true
           }}
           onSave={(form) => saveService(view.itemId, view.editKey, form)}
           onCancel={() => setView(view.editKey ? { name: 'basket' } : { name: 'services' })} /> :
@@ -436,10 +463,15 @@ export function SaleDialogProvider({ children }: {children: React.ReactNode;}) {
                             {money(amounts.unit)} l’unité{product?.vat ? ' TTC' : ''}
                             {tooMany ? ` · stock insuffisant (${product?.stock ?? 0})` : ''}
                           </p> :
-                    <p className="truncate text-xs text-ink-500">
-                            RDV le {fmtShortDate(line.date)} à {line.time}
-                            {line.note ? ` · ${line.note}` : ''}
-                          </p>}
+                    <div className="space-y-1">
+                            <p className="truncate text-xs text-ink-500">
+                              RDV le {fmtShortDate(line.date)} à {line.time}
+                              {line.note ? ` · ${line.note}` : ''}
+                            </p>
+                            <Badge tone={line.paid ? 'brand' : 'warning'}>
+                              {line.paid ? 'Payé à la réservation' : 'À payer le jour du RDV'}
+                            </Badge>
+                          </div>}
                       </div>
 
                       {line.kind === 'produit' ?
@@ -479,7 +511,9 @@ export function SaleDialogProvider({ children }: {children: React.ReactNode;}) {
                         </div> : null}
 
                       <span className="w-28 shrink-0 text-right">
-                        <span className="block text-sm font-semibold text-ink-900">{money(amounts.total)}</span>
+                        <span className={`block text-sm font-semibold ${line.kind === 'service' && !line.paid ? 'text-ink-400' : 'text-ink-900'}`}>{money(amounts.total)}</span>
+                        {line.kind === 'service' && !line.paid ?
+                    <span className="block text-xs text-amber-700">le jour du RDV</span> : null}
                         {amounts.discount > 0 ?
                     <span className="block text-xs text-ink-400 line-through">{money(amounts.gross)}</span> : null}
                       </span>
@@ -505,10 +539,12 @@ export function SaleDialogProvider({ children }: {children: React.ReactNode;}) {
                   </> : null}
                 {totals.vat > 0 ?
               <p className="text-xs text-ink-500">dont TVA : {money(totals.vat)}</p> : null}
-                <p className="text-xs uppercase tracking-wide text-ink-400">Total</p>
-                <p className="text-xl font-semibold text-ink-900">{money(total)}</p>
+                <p className="text-xs uppercase tracking-wide text-ink-400">{payLater > 0 ? 'À payer maintenant' : 'Total'}</p>
+                <p className="text-xl font-semibold text-ink-900">{money(payNow)}</p>
+                {payLater > 0 ?
+              <p className="text-xs font-medium text-amber-700">À régler le jour du RDV : {money(payLater)}</p> : null}
                 {can('finance.view') && lines.length > 0 ?
-              <p className="text-xs text-ink-500">Profit généré : {money(profit)}</p> : null}
+              <p className="text-xs text-ink-500">Profit généré{payLater > 0 ? ' maintenant' : ''} : {money(profit)}</p> : null}
               </div>
               <div className="flex gap-2">
                 <Button type="button" variant="danger" onClick={cancelSale}>Annuler la vente</Button>

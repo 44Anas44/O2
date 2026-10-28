@@ -20,6 +20,8 @@ import {
   PanelHeader } from
 '../components/ui/Primitives';
 import { money } from '../utils/format';
+import { cancelConfirmMessage, lineState, paymentLabel } from '../utils/saleAccounting';
+import type { Appointment } from '../types';
 import {
   WEEKDAYS,
   buildMonthGrid,
@@ -29,7 +31,7 @@ import {
 '../utils/date';
 
 export function Agenda() {
-  const { appointments, setAppointmentStatus, removeAppointment, services } =
+  const { appointments, setAppointmentStatus, removeAppointment, services, saleByAppointment } =
   useStore();
   const { openSale } = useSaleDialog();
   const { can } = useAuth();
@@ -57,15 +59,25 @@ export function Agenda() {
     [appointments, selected]
   );
 
+  // Montant réellement vendu (prix au moment de la réservation) ; à défaut, prix actuel du service.
+  const amountOf = (appointment: Appointment) =>
+  saleByAppointment.get(appointment.id)?.total ??
+  services.find((service) => service.id === appointment.serviceId)?.price ??
+  0;
+  const stateOf = (appointment: Appointment) => {
+    const sale = saleByAppointment.get(appointment.id);
+    return sale ? lineState(sale, appointment) : null;
+  };
+
   const dayRevenue = dayList.
   filter((appointment) => appointment.status !== 'annulé').
-  reduce(
-    (sum, appointment) =>
-    sum + (
-    services.find((service) => service.id === appointment.serviceId)?.price ??
-    0),
-    0
-  );
+  reduce((sum, appointment) => sum + amountOf(appointment), 0);
+
+  const cancel = (appointment: Appointment) => {
+    const message = cancelConfirmMessage(saleByAppointment.get(appointment.id));
+    if (message && !window.confirm(message)) return;
+    setAppointmentStatus(appointment.id, 'annulé');
+  };
 
   return (
     <div className="mx-auto grid max-w-6xl gap-6 xl:grid-cols-5">
@@ -181,8 +193,15 @@ export function Agenda() {
                       <span className="truncate">{appointment.client}</span>
                     </p>
                     <p className="mt-1 truncate text-sm text-ink-500">
-                      {appointment.serviceName} · {appointment.durationMin} min
+                      {appointment.serviceName} · {money(amountOf(appointment))} · {appointment.durationMin} min
                     </p>
+                    {stateOf(appointment) && stateOf(appointment) !== 'annulé' ?
+                <span className="mt-1.5 inline-flex">
+                        <Badge tone={stateOf(appointment) === 'à-payer' ? 'warning' : 'brand'}>
+                          {paymentLabel(stateOf(appointment)!)}
+                        </Badge>
+                      </span> :
+                null}
                     {appointment.phone ?
                 <p className="mt-1 flex items-center gap-1.5 text-xs text-ink-500">
                         <PhoneIcon className="h-3 w-3" />
@@ -195,36 +214,48 @@ export function Agenda() {
                       </p> :
                 null}
                   </div>
-                  <Badge
-                tone={
-                appointment.status === 'honoré' ?
-                'brand' :
-                appointment.status === 'annulé' ?
-                'danger' :
-                'neutral'
-                }>
-                
-                    {appointment.status}
-                  </Badge>
+                  <div className="flex shrink-0 flex-col items-end gap-1">
+                    <Badge
+                  tone={
+                  appointment.status === 'honoré' ?
+                  'brand' :
+                  appointment.status === 'annulé' ?
+                  'danger' :
+                  'neutral'
+                  }>
+                  
+                      {appointment.status}
+                    </Badge>
+                    {appointment.status === 'prévu' && appointment.date < todayKey() ?
+                <Badge tone="warning">En retard</Badge> :
+                null}
+                  </div>
                 </div>
                 <div className="mt-3"><AppointmentSlipButton appointment={appointment} /></div>
                 {appointment.status === 'prévu' ?
-            <div className="mt-3 flex gap-2">
-                    <Button
-                size="sm"
-                variant="secondary"
-                onClick={() => setAppointmentStatus(appointment.id, 'honoré')}>
-                
-                      Marquer honoré
-                    </Button>
-                    <Button
-                size="sm"
-                variant="danger"
-                onClick={() => setAppointmentStatus(appointment.id, 'annulé')}>
-                
-                      Annuler
-                    </Button>
-                  </div> :
+            <>
+                    {stateOf(appointment) === 'à-payer' ?
+              <p className="mt-3 text-xs text-amber-700">
+                        Non payé : {money(amountOf(appointment))} sera ajouté aux ventes du {fmtLongDate(appointment.date)} une fois le rendez-vous marqué honoré.
+                      </p> :
+              null}
+                    <div className="mt-3 flex gap-2">
+                      <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => setAppointmentStatus(appointment.id, 'honoré')}>
+                  
+                        Marquer honoré
+                      </Button>
+                      <Button
+                  size="sm"
+                  variant="danger"
+                  onClick={() => cancel(appointment)}>
+                  
+                        Annuler
+                      </Button>
+                    </div>
+                  </> :
             appointment.status === 'annulé' && can('appointments.delete') ?
             <div className="mt-3">
                     <Button

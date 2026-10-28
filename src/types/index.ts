@@ -65,12 +65,21 @@ export type Sale = {
   unitCost: number;
   total: number;
   profit: number;
-  /** yyyy-MM-dd */
+  /**
+   * yyyy-MM-dd — date à laquelle la ligne est comptée dans le chiffre d'affaires :
+   * jour de la vente (produit, ou service payé à la réservation) ou date du
+   * rendez-vous (service non payé à la réservation).
+   */
   date: string;
   /** HH:mm */
   time: string;
   client: string;
   appointmentId?: string;
+  /**
+   * Payé à la réservation. Toujours vrai pour un produit ; pour un service,
+   * faux = le client règle le jour du rendez-vous (bon de rendez-vous, pas de reçu).
+   */
+  paid: boolean;
   /** Numéro de reçu séquentiel (attribué par la base de données). */
   /** Reçu auquel appartient cette ligne (un reçu = plusieurs lignes). */
   receiptId: string;
@@ -127,6 +136,7 @@ export type Invitation = {
 /** Un reçu : un numéro, un client, une date ; regroupe une ou plusieurs lignes de vente. */
 export type Receipt = {
   id: string;
+  /** 0 = aucun reçu délivré (vente composée uniquement de rendez-vous non payés). */
   receiptNo: number;
   client: string;
   /** Société de l'acheteur (vente par lot). */

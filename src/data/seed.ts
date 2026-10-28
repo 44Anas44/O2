@@ -46,7 +46,7 @@ export const seedExpenses: Expense[] = [
 { id: 'exp_5', label: 'Entretien climatiseur', amount: 350, date: d(0), category: 'Matériel', source: 'manuelle' }];
 
 
-export const seedSales: Omit<Sale, 'receiptId' | 'discountPct' | 'vatAmount' | 'receiptNo' | 'createdByName'>[] = [
+export const seedSales: Omit<Sale, 'receiptId' | 'discountPct' | 'vatAmount' | 'receiptNo' | 'createdByName' | 'paid'>[] = [
 { id: 'sal_1', kind: 'service', itemId: 'srv_1', itemName: 'Consultation générale', quantity: 1, unitPrice: 300, unitCost: 0, total: 300, profit: 300, date: d(-5), time: '09:30', client: 'Youssef Amrani', appointmentId: 'apt_p1' },
 { id: 'sal_2', kind: 'produit', itemId: 'prd_1', itemName: 'Paracétamol 500 mg', quantity: 3, unitPrice: 20, unitCost: 12, total: 60, profit: 24, date: d(-5), time: '10:05', client: 'Comptoir' },
 { id: 'sal_3', kind: 'service', itemId: 'srv_6', itemName: 'Bilan sanguin', quantity: 1, unitPrice: 400, unitCost: 0, total: 400, profit: 400, date: d(-3), time: '08:45', client: 'Nadia Bouzidi', appointmentId: 'apt_p2' },
@@ -74,7 +74,7 @@ export const seedAppointments: Omit<Appointment, 'createdByName'>[] = [
 
 
 /** Ventes de services déjà encaissées pour les rendez-vous à venir. */
-export const seedUpcomingServiceSales: Omit<Sale, 'receiptId' | 'discountPct' | 'vatAmount' | 'receiptNo' | 'createdByName'>[] = seedAppointments.
+export const seedUpcomingServiceSales: Omit<Sale, 'receiptId' | 'discountPct' | 'vatAmount' | 'receiptNo' | 'createdByName' | 'paid'>[] = seedAppointments.
 filter((a) => a.status === 'prévu' && a.saleId).
 map((a) => ({
   id: a.saleId as string,

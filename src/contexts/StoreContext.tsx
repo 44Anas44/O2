@@ -35,10 +35,11 @@ import {
   serviceToRow } from
 '../lib/mappers';
 import { dayKey, monthKey, nowTime, todayKey } from '../utils/date';
+import { isCounted } from '../utils/saleAccounting';
 
 export type BasketLine =
 {kind: 'produit';itemId: string;quantity: number;/** Remise en % (vente par lot, rôles autorisés). */discountPct?: number;} |
-{kind: 'service';itemId: string;date: string;time: string;note: string;};
+{kind: 'service';itemId: string;date: string;time: string;note: string;/** Payé à la réservation (sinon : réglé le jour du rendez-vous). */paid: boolean;};
 
 export type NewBasket = {
   client: string;
@@ -56,6 +57,8 @@ export type CreatedSale = {
   receipt: Receipt;
   sales: Sale[];
   appointments: Appointment[];
+  /** Renseigné si la base de données n'est pas à jour (migration_rdv_payment.sql non exécutée). */
+  warning?: string;
 };
 
 export type CreateSaleResult = {ok: true;result: CreatedSale;} | {ok: false;error: string;};
@@ -65,6 +68,13 @@ type StoreValue = {
   services: ServiceItem[];
   products: Product[];
   sales: Sale[];
+  /**
+   * Lignes qui entrent dans le chiffre d'affaires, le profit et les statistiques : exclut les
+   * services annulés et les services non payés pas encore honorés (voir utils/saleAccounting).
+   */
+  countedSales: Sale[];
+  /** Ligne de vente de chaque rendez-vous (clé : id du rendez-vous). */
+  saleByAppointment: Map<string, Sale>;
   appointments: Appointment[];
   expenses: Expense[];
   recurring: RecurringExpense[];
@@ -327,6 +337,23 @@ export function StoreProvider({ children }: {children: React.ReactNode;}) {
     [products]
   );
 
+  const saleByAppointment = useMemo(() => {
+    const map = new Map<string, Sale>();
+    sales.forEach((sale) => {
+      if (sale.appointmentId) map.set(sale.appointmentId, sale);
+    });
+    return map;
+  }, [sales]);
+
+  // Dérivé (rien n'est réécrit en base quand un rendez-vous change d'état) : annuler ou honorer
+  // un rendez-vous met à jour tous les totaux, à la date de comptabilisation de la ligne.
+  const countedSales = useMemo(() => {
+    const byId = new Map(appointments.map((appointment) => [appointment.id, appointment]));
+    return sales.filter((sale) =>
+    isCounted(sale, sale.appointmentId ? byId.get(sale.appointmentId) : undefined)
+    );
+  }, [sales, appointments]);
+
   const pushExpense = useCallback(
     async (expense: Omit<Expense, 'id'>) => {
       if (!userId) return;
@@ -542,7 +569,7 @@ export function StoreProvider({ children }: {children: React.ReactNode;}) {
         p_lines: input.lines.map((line) =>
         line.kind === 'produit' ?
         { kind: 'produit', item_id: line.itemId, quantity: line.quantity, discount_pct: line.discountPct ?? 0 } :
-        { kind: 'service', item_id: line.itemId, date: line.date, time: line.time, note: line.note }
+        { kind: 'service', item_id: line.itemId, date: line.date, time: line.time, note: line.note, paid: line.paid }
         )
       });
       if (error || !data) {
@@ -554,6 +581,16 @@ export function StoreProvider({ children }: {children: React.ReactNode;}) {
         sales: (data.sales ?? []).map(saleFromRow),
         appointments: (data.appointments ?? []).map(appointmentFromRow)
       };
+
+      // Ancienne fonction create_sale côté Supabase : elle ignore « paid » et enregistre tout comme
+      // payé (avec un reçu). On le signale au lieu de laisser croire que le rendez-vous est non payé.
+      const askedUnpaid = input.lines.some((line) => line.kind === 'service' && !line.paid);
+      const dbOutdated = (data.sales ?? []).some((row: any) => row.kind === 'service' && !('paid' in row));
+      if (askedUnpaid && dbOutdated) {
+        result.warning =
+        'La base de données n’est pas à jour : ce rendez-vous a été enregistré comme PAYÉ. ' +
+        'Exécutez supabase/migration_rdv_payment.sql dans Supabase (SQL Editor), puis corrigez cette vente.';
+      }
 
       setReceipts((prev) => upsertById(prev, result.receipt));
       setSales((prev) => result.sales.reduce((list, sale) => upsertById(list, sale), prev));
@@ -606,6 +643,8 @@ export function StoreProvider({ children }: {children: React.ReactNode;}) {
       services,
       products,
       sales,
+      countedSales,
+      saleByAppointment,
       appointments,
       expenses,
       recurring,
@@ -633,6 +672,8 @@ export function StoreProvider({ children }: {children: React.ReactNode;}) {
     services,
     products,
     sales,
+    countedSales,
+    saleByAppointment,
     appointments,
     expenses,
     recurring,

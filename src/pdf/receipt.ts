@@ -33,6 +33,7 @@ import {
 './kit';
 import { amountInWords } from './words';
 import { VAT_RATE } from '../lib/pricing';
+import { hasReceiptNo, isPaidAtBooking } from '../utils/saleAccounting';
 
 export type BuiltPdf = {doc: import('jspdf').jsPDF;filename: string;};
 
@@ -53,7 +54,10 @@ function lastTableY(ctx: DocContext, fallback: number): number {
 
 export type SaleReceiptInput = {
   receipt: Receipt;
-  /** Lignes du reçu (produits et services). */
+  /**
+   * Lignes de la vente (produits et services). Seules les lignes payées à la réservation figurent
+   * sur le reçu : un service « à payer le jour du RDV » a son bon de rendez-vous, pas de reçu.
+   */
   lines: Sale[];
   /** Rendez-vous créés par les lignes de service. */
   appointments: Appointment[];
@@ -61,7 +65,8 @@ export type SaleReceiptInput = {
   generatedBy: string;
 };
 
-export function buildSaleReceipt({ receipt, lines, appointments, center, generatedBy }: SaleReceiptInput): BuiltPdf {
+export function buildSaleReceipt({ receipt, lines: allLines, appointments, center, generatedBy }: SaleReceiptInput): BuiltPdf {
+  const lines = allLines.filter(isPaidAtBooking);
   const number = receiptNumber(receipt.receiptNo);
   const ctx = createDoc('a5', `Reçu ${number}`, generatedBy, center);
   const { doc, W, H, M } = ctx;
@@ -258,7 +263,7 @@ export function buildAppointmentSlip({
   let y = drawHeader(ctx, {
     label: 'RENDEZ-VOUS',
     reference: `N° ${code}`,
-    caption: appointment.status === 'annulé' ? 'Rendez-vous annulé' : 'Confirmation de rendez-vous'
+    caption: appointment.status === 'annulé' ? 'Rendez-vous annulé' : 'Bon de rendez-vous'
   });
 
   // Carte date / heure
@@ -354,15 +359,20 @@ export function buildAppointmentSlip({
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8.6);
   setText(doc, COLORS.ink700);
-  if (sale) {
-    doc.text(
-      clean(`Montant réglé : ${pdfMoney(sale.total)}  ·  Reçu n° ${receiptNumber(sale.receiptNo)}`),
-      M,
-      y
-    );
+  const receiptRef = sale && hasReceiptNo(sale.receiptNo) ? `  ·  Reçu n° ${receiptNumber(sale.receiptNo)}` : '';
+  let payment: string;
+  if (sale && sale.kind === 'service' && !sale.paid) {
+    // Non payé à la réservation : le client règle le jour du rendez-vous.
+    payment =
+    appointment.status === 'annulé' ? 'Rendez-vous annulé : aucun montant dû.' :
+    appointment.status === 'honoré' ? `Montant réglé sur place : ${pdfMoney(sale.total)}` :
+    `Montant à régler le jour du rendez-vous : ${pdfMoney(sale.total)}`;
+  } else if (sale) {
+    payment = `Montant réglé à la réservation : ${pdfMoney(sale.total)}${receiptRef}`;
   } else {
-    doc.text('Montant à régler sur place.', M, y);
+    payment = 'Montant à régler sur place.';
   }
+  doc.text(clean(payment), M, y);
   y += 8;
 
   // Consignes

@@ -6,6 +6,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useSettings } from '../contexts/SettingsContext';
 import { downloadAppointmentSlip, downloadSaleReceipt } from '../pdf';
 import { Button } from './ui/Primitives';
+import { hasReceiptNo, isPaidAtBooking } from '../utils/saleAccounting';
 
 type Props = {size?: 'sm' | 'md';variant?: 'secondary' | 'ghost';label?: string;};
 
@@ -31,6 +32,10 @@ export function SaleReceiptButton({ receipt, size = 'sm', variant = 'secondary',
   const { displayName } = useAuth();
   const { center } = useSettings();
   const { busy, run } = useBusy();
+  // Aucun reçu délivré (rendez-vous tous non payés) : il n'y a que des bons de rendez-vous.
+  if (!hasReceiptNo(receipt.receiptNo)) return null;
+  // Pas de reçu s'il ne reste aucun article payé (un service non payé n'a qu'un bon de rendez-vous).
+  if (!sales.some((sale) => sale.receiptId === receipt.id && isPaidAtBooking(sale))) return null;
   return (
     <Button
       size={size}

@@ -12,7 +12,8 @@ import { downloadStatsReport } from '../pdf';
 const presets = Object.keys(PRESET_LABELS) as RangePreset[];
 
 export function Reports() {
-  const { sales, expenses, appointments, products } = useStore();
+  // `countedSales` : sans les services annulés ni les services non payés pas encore honorés.
+  const { countedSales: sales, expenses, appointments, products } = useStore();
   const { displayName } = useAuth();
   const { center } = useSettings();
   const [preset, setPreset] = useState<RangePreset>('mois');

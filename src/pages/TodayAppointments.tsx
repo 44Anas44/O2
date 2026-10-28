@@ -11,10 +11,12 @@ import {
   PanelHeader } from
 '../components/ui/Primitives';
 import { initials, money } from '../utils/format';
+import { cancelConfirmMessage, lineState, paymentLabel } from '../utils/saleAccounting';
+import type { Appointment } from '../types';
 import { fmtLongDate, todayKey, tomorrowKey } from '../utils/date';
 
 export function TodayAppointments() {
-  const { appointments, services, setAppointmentStatus } = useStore();
+  const { appointments, services, setAppointmentStatus, saleByAppointment, receipts } = useStore();
   const { openSale } = useSaleDialog();
   const [scope, setScope] = useState<'today' | 'tomorrow'>('today');
 
@@ -31,11 +33,51 @@ export function TodayAppointments() {
   const priceOf = (serviceId: string) =>
   services.find((service) => service.id === serviceId)?.price ?? 0;
 
+  // Montant réellement vendu (prix au moment de la réservation) ; à défaut, prix actuel du service.
+  const amountOf = (appointment: Appointment) =>
+  saleByAppointment.get(appointment.id)?.total ?? priceOf(appointment.serviceId);
+  const stateOf = (appointment: Appointment) => {
+    const sale = saleByAppointment.get(appointment.id);
+    return sale ? lineState(sale, appointment) : null;
+  };
+
   const active = list.filter((appointment) => appointment.status !== 'annulé');
-  const expected = active.reduce(
-    (sum, appointment) => sum + priceOf(appointment.serviceId),
-    0
+
+  // Jour où l'argent d'un rendez-vous PAYÉ À LA RÉSERVATION est entré = jour de la vente (date du reçu).
+  // (On lit la date du reçu : elle est juste même pour les anciennes ventes, dont la ligne portait la date du RDV.)
+  const receiptDate = new Map(receipts.map((receipt) => [receipt.id, receipt.date]));
+  const paymentDayOf = (appointment: Appointment): string | null => {
+    const sale = saleByAppointment.get(appointment.id);
+    if (!sale || !sale.paid) return null;
+    return receiptDate.get(sale.receiptId) ?? sale.date;
+  };
+
+  // Recette attendue = argent qui doit ENTRER ce jour-là :
+  //  - rendez-vous du jour, sauf ceux déjà payés un jour AVANT (cet argent est déjà rentré) ;
+  //  - rendez-vous d'un jour ultérieur payés à la réservation CE jour-là (l'argent entre aujourd'hui).
+  const awaited = active.filter((appointment) => {
+    const paidOn = paymentDayOf(appointment);
+    return !(paidOn && paidOn < dateKey);
+  });
+  const alreadyPaid = active.filter((appointment) => {
+    const paidOn = paymentDayOf(appointment);
+    return Boolean(paidOn && paidOn < dateKey);
+  });
+  const paidInAdvance = appointments.filter((appointment) =>
+  appointment.status !== 'annulé' && appointment.date > dateKey && paymentDayOf(appointment) === dateKey
   );
+  const advanceTotal = paidInAdvance.reduce((sum, appointment) => sum + amountOf(appointment), 0);
+  const expected = awaited.reduce((sum, appointment) => sum + amountOf(appointment), 0) + advanceTotal;
+  // Part de la recette encore à encaisser sur place (non payé, pas encore honoré).
+  const toCollect = active.
+  filter((appointment) => stateOf(appointment) === 'à-payer').
+  reduce((sum, appointment) => sum + amountOf(appointment), 0);
+
+  const cancel = (appointment: Appointment) => {
+    const message = cancelConfirmMessage(saleByAppointment.get(appointment.id));
+    if (message && !window.confirm(message)) return;
+    setAppointmentStatus(appointment.id, 'annulé');
+  };
   const remaining = list.filter((appointment) => appointment.status === 'prévu');
 
   const counts = {
@@ -103,6 +145,19 @@ export function TodayAppointments() {
           <p className="mt-2 text-2xl font-semibold text-brand-300">
             {money(expected)}
           </p>
+          {advanceTotal > 0 ?
+          <p className="mt-1 text-xs text-ink-400">
+              dont {money(advanceTotal)} payés ce jour pour {paidInAdvance.length} RDV à venir
+            </p> :
+          null}
+          {alreadyPaid.length > 0 ?
+          <p className="mt-1 text-xs text-ink-400">
+              hors {money(alreadyPaid.reduce((sum, appointment) => sum + amountOf(appointment), 0))} déjà payés les jours précédents
+            </p> :
+          null}
+          {toCollect > 0 ?
+          <p className="mt-1 text-xs text-ink-400">dont {money(toCollect)} à encaisser sur place</p> :
+          null}
         </div>
         <div className="rounded-xl border border-ink-100 bg-white p-5 shadow-card">
           <p className="text-xs font-medium uppercase tracking-wide text-ink-400">
@@ -152,9 +207,16 @@ export function TodayAppointments() {
                   </p>
                   <p className="truncate text-sm text-ink-500">
                     {appointment.serviceName} ·{' '}
-                    {money(priceOf(appointment.serviceId))} ·{' '}
+                    {money(amountOf(appointment))} ·{' '}
                     {appointment.durationMin} min
                   </p>
+                  {stateOf(appointment) && stateOf(appointment) !== 'annulé' ?
+              <span className="mt-1 inline-flex">
+                      <Badge tone={stateOf(appointment) === 'à-payer' ? 'warning' : 'brand'}>
+                        {paymentLabel(stateOf(appointment)!)}
+                      </Badge>
+                    </span> :
+              null}
                   {appointment.note ?
               <p className="mt-0.5 text-xs italic text-ink-500">
                       {appointment.note}
@@ -180,7 +242,7 @@ export function TodayAppointments() {
                     <Button
                 size="sm"
                 variant="danger"
-                onClick={() => setAppointmentStatus(appointment.id, 'annulé')}>
+                onClick={() => cancel(appointment)}>
                 
                       Annulé
                     </Button>

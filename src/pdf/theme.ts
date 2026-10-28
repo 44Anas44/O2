@@ -75,6 +75,8 @@ export function dateTimeNow(): string {
 }
 
 export function receiptNumber(no: number): string {
+  // 0 / négatif : aucun reçu délivré (vente composée uniquement de rendez-vous non payés).
+  if (!(no > 0)) return '-';
   return `REC-${String(no).padStart(6, '0')}`;
 }
 

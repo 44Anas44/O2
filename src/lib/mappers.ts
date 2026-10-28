@@ -74,6 +74,8 @@ export function saleFromRow(row: any): Sale {
     time: row.time,
     client: row.client,
     appointmentId: row.appointment_id ?? undefined,
+    // Les anciennes lignes (avant la migration) sont toutes des lignes payées.
+    paid: row.paid === undefined || row.paid === null ? true : Boolean(row.paid),
     receiptId: row.receipt_id ?? row.id,
     discountPct: Number(row.discount_pct ?? 0),
     vatAmount: Number(row.vat_amount ?? 0),

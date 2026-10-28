@@ -26,7 +26,7 @@ const emptyForm = {
 };
 
 export function Services() {
-  const { services, saveService, removeService, sales } = useStore();
+  const { services, saveService, removeService, countedSales: sales } = useStore();
   const { can } = useAuth();
   const canEdit = can('catalog.edit');
   const [query, setQuery] = useState('');
