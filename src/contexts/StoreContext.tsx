@@ -337,22 +337,35 @@ export function StoreProvider({ children }: {children: React.ReactNode;}) {
     [products]
   );
 
+  // Date de comptabilisation d'un service PAYÉ À LA RÉSERVATION = jour de la vente (date du reçu).
+  // Les anciennes ventes (avant migration_rdv_payment) portaient la date du rendez-vous sur la ligne :
+  // on la ramène ici au jour du paiement, sans toucher à la base. Les lignes non payées gardent la
+  // date du rendez-vous (c'est elle qui compte quand le rendez-vous est honoré).
+  const salesView = useMemo(() => {
+    const receiptDate = new Map(receipts.map((receipt) => [receipt.id, receipt.date]));
+    return sales.map((sale) => {
+      if (sale.kind !== 'service' || !sale.paid) return sale;
+      const paidOn = receiptDate.get(sale.receiptId);
+      return paidOn && paidOn !== sale.date ? { ...sale, date: paidOn } : sale;
+    });
+  }, [sales, receipts]);
+
   const saleByAppointment = useMemo(() => {
     const map = new Map<string, Sale>();
-    sales.forEach((sale) => {
+    salesView.forEach((sale) => {
       if (sale.appointmentId) map.set(sale.appointmentId, sale);
     });
     return map;
-  }, [sales]);
+  }, [salesView]);
 
   // Dérivé (rien n'est réécrit en base quand un rendez-vous change d'état) : annuler ou honorer
   // un rendez-vous met à jour tous les totaux, à la date de comptabilisation de la ligne.
   const countedSales = useMemo(() => {
     const byId = new Map(appointments.map((appointment) => [appointment.id, appointment]));
-    return sales.filter((sale) =>
+    return salesView.filter((sale) =>
     isCounted(sale, sale.appointmentId ? byId.get(sale.appointmentId) : undefined)
     );
-  }, [sales, appointments]);
+  }, [salesView, appointments]);
 
   const pushExpense = useCallback(
     async (expense: Omit<Expense, 'id'>) => {
@@ -642,7 +655,7 @@ export function StoreProvider({ children }: {children: React.ReactNode;}) {
       loading,
       services,
       products,
-      sales,
+      sales: salesView,
       countedSales,
       saleByAppointment,
       appointments,
@@ -671,7 +684,7 @@ export function StoreProvider({ children }: {children: React.ReactNode;}) {
     loading,
     services,
     products,
-    sales,
+    salesView,
     countedSales,
     saleByAppointment,
     appointments,
