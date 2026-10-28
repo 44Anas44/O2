@@ -1,6 +1,6 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">Centre 2 Manager</string>
+    <string name="app_name">Kassab Center Manager</string>
     <string name="title_activity_main">Centre 2 Manager</string>
     <string name="package_name">com.centre2.manager</string>
     <string name="custom_url_scheme">com.centre2.manager</string>
