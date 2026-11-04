@@ -4,6 +4,7 @@ import { useStore } from '../contexts/StoreContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useSettings } from '../contexts/SettingsContext';
 import { Button, Field, Panel, PanelHeader, inputClass } from '../components/ui/Primitives';
+import { useConfirm } from '../components/ui/ConfirmDialog';
 import { HeadlineStats } from '../components/dashboard/StatBlocks';
 import { PRESET_LABELS, presetRange, type RangePreset } from '../utils/reportRange';
 import { statsFor } from '../utils/stats';
@@ -15,6 +16,7 @@ export function Reports() {
   // `countedSales` : sans les services annulés ni les services non payés pas encore honorés.
   const { countedSales: sales, expenses, appointments, products } = useStore();
   const { displayName } = useAuth();
+  const { notify } = useConfirm();
   const { center } = useSettings();
   const [preset, setPreset] = useState<RangePreset>('mois');
   const [custom, setCustom] = useState({ start: '', end: '' });
@@ -31,7 +33,10 @@ export function Reports() {
     } catch (error) {
       // eslint-disable-next-line no-console
       console.error(error);
-      window.alert('Impossible de générer le rapport PDF.');
+      // Le bouton se réactive avant l'affichage du message, sans attendre sa fermeture.
+      setBusy(false);
+      await notify('Impossible de générer le rapport PDF.', 'Rapport PDF');
+      return;
     } finally {
       setBusy(false);
     }

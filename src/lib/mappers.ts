@@ -163,6 +163,7 @@ export function receiptFromRow(row: any): Receipt {
     receiptNo: Number(row.receipt_no ?? 0),
     client: row.client ?? '',
     company: row.company ?? '',
+    taxId: row.tax_id ?? '',
     phone: row.phone ?? '',
     date: row.date,
     time: row.time ?? '',
@@ -177,6 +178,7 @@ export function buyerFromRow(row: any): Buyer {
     id: row.id,
     name: row.name ?? '',
     company: row.company ?? '',
+    taxId: row.tax_id ?? '',
     phone: row.phone ?? ''
   };
 }

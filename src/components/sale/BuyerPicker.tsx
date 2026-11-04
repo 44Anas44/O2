@@ -14,21 +14,21 @@ type Props = {
   buyers: Buyer[];
   value: string | null;
   onChange: (id: string | null) => void;
-  onCreate: (input: {name: string;company: string;phone: string;}) => Promise<Buyer | null>;
+  onCreate: (input: {name: string;company: string;taxId: string;phone: string;}) => Promise<Buyer | null>;
 };
 
 /** Choix (recherche) ou création rapide de l'acheteur d'une vente par lot. */
 export function BuyerPicker({ buyers, value, onChange, onCreate }: Props) {
   const [query, setQuery] = useState('');
   const [creating, setCreating] = useState(false);
-  const [form, setForm] = useState({ name: '', company: '', phone: '' });
+  const [form, setForm] = useState({ name: '', company: '', taxId: '', phone: '' });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const selected = buyers.find((buyer) => buyer.id === value);
   const results = useMemo(
     () =>
-    filterBySearch(buyers, query, (buyer) => buyerLabel(buyer), (buyer) => `${buyer.phone} ${buyer.company}`).slice(0, 8),
+    filterBySearch(buyers, query, (buyer) => buyerLabel(buyer), (buyer) => `${buyer.phone} ${buyer.company} ${buyer.taxId}`).slice(0, 8),
     [buyers, query]
   );
 
@@ -45,7 +45,7 @@ export function BuyerPicker({ buyers, value, onChange, onCreate }: Props) {
       setError('Enregistrement impossible.');
       return;
     }
-    setForm({ name: '', company: '', phone: '' });
+    setForm({ name: '', company: '', taxId: '', phone: '' });
     setCreating(false);
     setQuery('');
     onChange(buyer.id);
@@ -59,7 +59,10 @@ export function BuyerPicker({ buyers, value, onChange, onCreate }: Props) {
         </span>
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-semibold text-ink-900">{buyerLabel(selected)}</p>
-          <p className="truncate text-xs text-ink-500">{selected.phone || 'Pas de téléphone'}</p>
+          <p className="truncate text-xs text-ink-500">
+            {selected.phone || 'Pas de téléphone'}
+            {selected.taxId ? ` · MF ${selected.taxId}` : ''}
+          </p>
         </div>
         <Button type="button" size="sm" variant="secondary" onClick={() => onChange(null)}>Changer</Button>
       </div>);
@@ -70,12 +73,15 @@ export function BuyerPicker({ buyers, value, onChange, onCreate }: Props) {
     return (
       <div className="space-y-3 rounded-lg border border-ink-200 p-4">
         <p className="text-sm font-semibold text-ink-900">Nouvel acheteur</p>
-        <div className="grid gap-3 sm:grid-cols-3">
+        <div className="grid gap-3 sm:grid-cols-2">
           <Field label="Nom">
             <input className={inputClass} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} autoFocus />
           </Field>
           <Field label="Société">
             <input className={inputClass} value={form.company} onChange={(e) => setForm({ ...form, company: e.target.value })} />
+          </Field>
+          <Field label="Matricule fiscal (facultatif)">
+            <input className={inputClass} value={form.taxId} onChange={(e) => setForm({ ...form, taxId: e.target.value })} placeholder="1234567/A/M/000" />
           </Field>
           <Field label="Téléphone">
             <input className={inputClass} value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />

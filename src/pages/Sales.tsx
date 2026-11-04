@@ -94,7 +94,7 @@ export function Sales() {
       if (lines.length === 0 || !inRange(receipt.date, range)) return;
       if (q) {
         const names = lines.map((line) => line.itemName).join(' ');
-        if (!normalize(`${receipt.client} ${receipt.company} ${receiptNumber(receipt.receiptNo)} ${names}`).includes(q)) return;
+        if (!normalize(`${receipt.client} ${receipt.company} ${receipt.taxId} ${receiptNumber(receipt.receiptNo)} ${names}`).includes(q)) return;
       }
       out.push({ type: 'receipt', key: receipt.id, receipt, lines, sort: `${receipt.date} ${receipt.time}` });
     });

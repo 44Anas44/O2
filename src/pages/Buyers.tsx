@@ -4,16 +4,18 @@ import { useStore } from '../contexts/StoreContext';
 import { useAuth } from '../contexts/AuthContext';
 import { Button, EmptyState, Field, Panel, PanelHeader, inputClass } from '../components/ui/Primitives';
 import { Modal } from '../components/ui/Modal';
+import { useConfirm } from '../components/ui/ConfirmDialog';
 import { SearchBox } from '../components/sale/SearchBox';
 import { filterBySearch } from '../utils/search';
 import { money } from '../utils/format';
 import type { Buyer } from '../types';
 
-const empty = { name: '', company: '', phone: '' };
+const empty = { name: '', company: '', taxId: '', phone: '' };
 
 export function Buyers() {
   const { buyers, receipts, sales, saveBuyer, removeBuyer } = useStore();
   const { can } = useAuth();
+  const { confirm } = useConfirm();
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Buyer | null>(null);
@@ -36,7 +38,7 @@ export function Buyers() {
   }, [receipts, sales]);
 
   const list = useMemo(
-    () => filterBySearch(buyers, query, (buyer) => `${buyer.company} ${buyer.name}`, (buyer) => buyer.phone),
+    () => filterBySearch(buyers, query, (buyer) => `${buyer.company} ${buyer.name}`, (buyer) => `${buyer.phone} ${buyer.taxId}`),
     [buyers, query]
   );
 
@@ -48,7 +50,7 @@ export function Buyers() {
   };
   const startEdit = (buyer: Buyer) => {
     setEditing(buyer);
-    setForm({ name: buyer.name, company: buyer.company, phone: buyer.phone });
+    setForm({ name: buyer.name, company: buyer.company, taxId: buyer.taxId, phone: buyer.phone });
     setError(null);
     setOpen(true);
   };
@@ -67,8 +69,14 @@ export function Buyers() {
     setOpen(false);
   };
 
-  const remove = (buyer: Buyer) => {
-    if (!window.confirm(`Supprimer l’acheteur « ${buyer.company || buyer.name} » ? Ses reçus déjà émis sont conservés.`)) return;
+  const remove = async (buyer: Buyer) => {
+    const ok = await confirm({
+      title: 'Supprimer l’acheteur',
+      message: `Supprimer l’acheteur « ${buyer.company || buyer.name} » ? Ses reçus déjà émis sont conservés.`,
+      confirmLabel: 'Supprimer',
+      tone: 'danger'
+    });
+    if (!ok) return;
     removeBuyer(buyer.id);
   };
 
@@ -107,6 +115,7 @@ export function Buyers() {
                     <p className="truncate text-xs text-ink-500">
                       {buyer.company && buyer.name ? `${buyer.name} · ` : ''}
                       {buyer.phone || 'Pas de téléphone'}
+                      {buyer.taxId ? ` · MF ${buyer.taxId}` : ''}
                     </p>
                   </div>
                   <p className="text-right text-sm text-ink-600">
@@ -135,9 +144,14 @@ export function Buyers() {
               <input className={inputClass} value={form.company} onChange={(e) => setForm({ ...form, company: e.target.value })} />
             </Field>
           </div>
-          <Field label="Téléphone">
-            <input className={inputClass} value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
-          </Field>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Matricule fiscal" hint="Facultatif — imprimé sur les reçus des ventes par lot.">
+              <input className={inputClass} value={form.taxId} onChange={(e) => setForm({ ...form, taxId: e.target.value })} placeholder="1234567/A/M/000" />
+            </Field>
+            <Field label="Téléphone">
+              <input className={inputClass} value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+            </Field>
+          </div>
           {error ? <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p> : null}
           <div className="flex justify-end gap-2">
             <Button type="button" variant="ghost" onClick={() => setOpen(false)}>Annuler</Button>

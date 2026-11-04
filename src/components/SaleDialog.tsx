@@ -18,6 +18,7 @@ import { useSettings } from '../contexts/SettingsContext';
 import { downloadAppointmentSlip, downloadSaleReceipt } from '../pdf';
 import { receiptNumber } from '../pdf/theme';
 import { Modal } from './ui/Modal';
+import { useConfirm } from './ui/ConfirmDialog';
 import { Badge, Button, Field, inputClass } from './ui/Primitives';
 import { ProductPicker } from './sale/ProductPicker';
 import { ServicePicker } from './sale/ServicePicker';
@@ -55,6 +56,7 @@ const nextKey = () => `l${(lineCounter += 1)}`;
 export function SaleDialogProvider({ children }: {children: React.ReactNode;}) {
   const { products, services, buyers, saveBuyer, createSale } = useStore();
   const { can, displayName } = useAuth();
+  const { confirm, notify } = useConfirm();
   const { center } = useSettings();
 
   const [open, setOpen] = useState(false);
@@ -182,14 +184,31 @@ export function SaleDialogProvider({ children }: {children: React.ReactNode;}) {
 
   /* ----------------------------- actions ----------------------------- */
 
-  const requestClose = () => {
-    if (!done && lines.length > 0 && !window.confirm('Abandonner cette vente ? Les articles du panier seront perdus.')) return;
+  const requestClose = async () => {
+    if (!done && lines.length > 0) {
+      const ok = await confirm({
+        title: 'Abandonner la vente',
+        message: 'Abandonner cette vente ? Les articles du panier seront perdus.',
+        confirmLabel: 'Abandonner',
+        cancelLabel: 'Continuer la vente',
+        tone: 'danger'
+      });
+      if (!ok) return;
+    }
     setOpen(false);
   };
 
-  const switchMode = (next: Mode) => {
+  const switchMode = async (next: Mode) => {
     if (next === mode) return;
-    if (lines.length > 0 && !window.confirm('Changer de type de vente vide le panier. Continuer ?')) return;
+    if (lines.length > 0) {
+      const ok = await confirm({
+        title: 'Changer de type de vente',
+        message: 'Changer de type de vente vide le panier. Continuer ?',
+        confirmLabel: 'Vider et changer',
+        tone: 'danger'
+      });
+      if (!ok) return;
+    }
     setMode(next);
     setLines([]);
     setBuyerId(null);
@@ -197,8 +216,17 @@ export function SaleDialogProvider({ children }: {children: React.ReactNode;}) {
     setError(null);
   };
 
-  const cancelSale = () => {
-    if (lines.length > 0 && !window.confirm('Annuler cette vente ? Les articles du panier seront perdus.')) return;
+  const cancelSale = async () => {
+    if (lines.length > 0) {
+      const ok = await confirm({
+        title: 'Annuler la vente',
+        message: 'Annuler cette vente ? Les articles du panier seront perdus.',
+        confirmLabel: 'Annuler la vente',
+        cancelLabel: 'Continuer la vente',
+        tone: 'danger'
+      });
+      if (!ok) return;
+    }
     setOpen(false);
   };
 
@@ -223,7 +251,7 @@ export function SaleDialogProvider({ children }: {children: React.ReactNode;}) {
     if (response.ok) setDone(response.result);else setError(response.error);
   };
 
-  const pdfError = () => window.alert('Impossible de générer le PDF.');
+  const pdfError = () => {void notify('Impossible de générer le PDF.', 'PDF');};
 
   const printReceipt = () => {
     if (!done) return;

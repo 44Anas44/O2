@@ -6,9 +6,11 @@ import { useAuth } from '../contexts/AuthContext';
 import { ROLES, ROLE_DESCRIPTIONS, ROLE_LABELS } from '../lib/permissions';
 import type { Invitation, Profile, Role } from '../types';
 import { Badge, Button, EmptyState, Field, Panel, PanelHeader, inputClass } from '../components/ui/Primitives';
+import { useConfirm } from '../components/ui/ConfirmDialog';
 
 export function Team() {
   const { ownerId, user } = useAuth();
+  const { confirm } = useConfirm();
   const [members, setMembers] = useState<Profile[]>([]);
   const [invites, setInvites] = useState<Invitation[]>([]);
   const [loading, setLoading] = useState(true);
@@ -58,7 +60,13 @@ export function Team() {
   };
 
   const removeMember = async (member: Profile) => {
-    if (!window.confirm(`Retirer l’accès de ${member.fullName || member.email} ?`)) return;
+    const ok = await confirm({
+      title: 'Retirer l’accès',
+      message: `Retirer l’accès de ${member.fullName || member.email} ?`,
+      confirmLabel: 'Retirer',
+      tone: 'danger'
+    });
+    if (!ok) return;
     await supabase.from('profiles').delete().eq('id', member.id);
     load();
   };

@@ -5,6 +5,7 @@ import { StoreProvider } from './contexts/StoreContext';
 import { SettingsProvider } from './contexts/SettingsContext';
 import { Settings } from './pages/Settings';
 import { SaleDialogProvider } from './components/SaleDialog';
+import { ConfirmProvider } from './components/ui/ConfirmDialog';
 import { AppLayout } from './components/AppLayout';
 import { Login } from './pages/Login';
 import { Dashboard } from './pages/Dashboard';
@@ -72,6 +73,7 @@ export function App() {
         <SettingsProvider>
         <StoreProvider>
           <HashRouter>
+            <ConfirmProvider>
             <SaleDialogProvider>
               <Routes>
                 <Route element={<AppLayout />}>
@@ -90,6 +92,7 @@ export function App() {
                 </Route>
               </Routes>
             </SaleDialogProvider>
+            </ConfirmProvider>
           </HashRouter>
         </StoreProvider>
         </SettingsProvider>

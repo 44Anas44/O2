@@ -6,12 +6,14 @@ import { useAuth } from '../contexts/AuthContext';
 import { useSettings } from '../contexts/SettingsContext';
 import { downloadAppointmentSlip, downloadSaleReceipt } from '../pdf';
 import { Button } from './ui/Primitives';
+import { useConfirm } from './ui/ConfirmDialog';
 import { hasReceiptNo, isPaidAtBooking } from '../utils/saleAccounting';
 
 type Props = {size?: 'sm' | 'md';variant?: 'secondary' | 'ghost';label?: string;};
 
 function useBusy() {
   const [busy, setBusy] = useState(false);
+  const { notify } = useConfirm();
   const run = async (task: () => Promise<void>) => {
     setBusy(true);
     try {
@@ -19,7 +21,8 @@ function useBusy() {
     } catch (error) {
       // eslint-disable-next-line no-console
       console.error(error);
-      window.alert('Impossible de générer le PDF.');
+      setBusy(false);
+      await notify('Impossible de générer le PDF.', 'PDF');
     } finally {
       setBusy(false);
     }

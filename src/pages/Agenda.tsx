@@ -12,6 +12,7 @@ import { useStore } from '../contexts/StoreContext';
 import { useSaleDialog } from '../components/SaleDialog';
 import { useAuth } from '../contexts/AuthContext';
 import { AppointmentSlipButton } from '../components/ReceiptButtons';
+import { useConfirm } from '../components/ui/ConfirmDialog';
 import {
   Badge,
   Button,
@@ -35,6 +36,7 @@ export function Agenda() {
   useStore();
   const { openSale } = useSaleDialog();
   const { can } = useAuth();
+  const { confirm } = useConfirm();
   const [monthRef, setMonthRef] = useState(new Date());
   const [selected, setSelected] = useState(todayKey());
 
@@ -73,9 +75,9 @@ export function Agenda() {
   filter((appointment) => appointment.status !== 'annulé').
   reduce((sum, appointment) => sum + amountOf(appointment), 0);
 
-  const cancel = (appointment: Appointment) => {
+  const cancel = async (appointment: Appointment) => {
     const message = cancelConfirmMessage(saleByAppointment.get(appointment.id));
-    if (message && !window.confirm(message)) return;
+    if (message && !(await confirm({ title: 'Annuler le rendez-vous', message, confirmLabel: 'Oui, annuler', cancelLabel: 'Non', tone: 'danger' }))) return;
     setAppointmentStatus(appointment.id, 'annulé');
   };
 

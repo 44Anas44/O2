@@ -93,7 +93,7 @@ type StoreValue = {
   removeRecurring: (id: string) => Promise<void>;
   receipts: Receipt[];
   buyers: Buyer[];
-  saveBuyer: (input: {id?: string;name: string;company: string;phone: string;}) => Promise<Buyer | null>;
+  saveBuyer: (input: {id?: string;name: string;company: string;taxId: string;phone: string;}) => Promise<Buyer | null>;
   removeBuyer: (id: string) => Promise<void>;
   createSale: (input: NewBasket) => Promise<CreateSaleResult>;
   setAppointmentStatus: (id: string, status: AppointmentStatus) => Promise<void>;
@@ -337,35 +337,22 @@ export function StoreProvider({ children }: {children: React.ReactNode;}) {
     [products]
   );
 
-  // Date de comptabilisation d'un service PAYÉ À LA RÉSERVATION = jour de la vente (date du reçu).
-  // Les anciennes ventes (avant migration_rdv_payment) portaient la date du rendez-vous sur la ligne :
-  // on la ramène ici au jour du paiement, sans toucher à la base. Les lignes non payées gardent la
-  // date du rendez-vous (c'est elle qui compte quand le rendez-vous est honoré).
-  const salesView = useMemo(() => {
-    const receiptDate = new Map(receipts.map((receipt) => [receipt.id, receipt.date]));
-    return sales.map((sale) => {
-      if (sale.kind !== 'service' || !sale.paid) return sale;
-      const paidOn = receiptDate.get(sale.receiptId);
-      return paidOn && paidOn !== sale.date ? { ...sale, date: paidOn } : sale;
-    });
-  }, [sales, receipts]);
-
   const saleByAppointment = useMemo(() => {
     const map = new Map<string, Sale>();
-    salesView.forEach((sale) => {
+    sales.forEach((sale) => {
       if (sale.appointmentId) map.set(sale.appointmentId, sale);
     });
     return map;
-  }, [salesView]);
+  }, [sales]);
 
   // Dérivé (rien n'est réécrit en base quand un rendez-vous change d'état) : annuler ou honorer
   // un rendez-vous met à jour tous les totaux, à la date de comptabilisation de la ligne.
   const countedSales = useMemo(() => {
     const byId = new Map(appointments.map((appointment) => [appointment.id, appointment]));
-    return salesView.filter((sale) =>
+    return sales.filter((sale) =>
     isCounted(sale, sale.appointmentId ? byId.get(sale.appointmentId) : undefined)
     );
-  }, [salesView, appointments]);
+  }, [sales, appointments]);
 
   const pushExpense = useCallback(
     async (expense: Omit<Expense, 'id'>) => {
@@ -545,7 +532,7 @@ export function StoreProvider({ children }: {children: React.ReactNode;}) {
   const saveBuyer = useCallback<StoreValue['saveBuyer']>(
     async (input) => {
       if (!userId) return null;
-      const row = { name: input.name.trim(), company: input.company.trim(), phone: input.phone.trim() };
+      const row = { name: input.name.trim(), company: input.company.trim(), tax_id: input.taxId.trim(), phone: input.phone.trim() };
       if (!row.name && !row.company) return null;
       const query = input.id ?
       supabase.from('buyers').update(row).eq('id', input.id).select().single() :
@@ -655,7 +642,7 @@ export function StoreProvider({ children }: {children: React.ReactNode;}) {
       loading,
       services,
       products,
-      sales: salesView,
+      sales,
       countedSales,
       saleByAppointment,
       appointments,
@@ -684,7 +671,7 @@ export function StoreProvider({ children }: {children: React.ReactNode;}) {
     loading,
     services,
     products,
-    salesView,
+    sales,
     countedSales,
     saleByAppointment,
     appointments,

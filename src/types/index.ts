@@ -141,6 +141,8 @@ export type Receipt = {
   client: string;
   /** Société de l'acheteur (vente par lot). */
   company: string;
+  /** Matricule fiscal de l'acheteur, copié sur le reçu à la vente (vente par lot). */
+  taxId: string;
   phone: string;
   date: string;
   time: string;
@@ -155,5 +157,7 @@ export type Buyer = {
   id: string;
   name: string;
   company: string;
+  /** Matricule fiscal (facultatif). */
+  taxId: string;
   phone: string;
 };

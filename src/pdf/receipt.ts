@@ -94,6 +94,7 @@ export function buildSaleReceipt({ receipt, lines: allLines, appointments, cente
   const clientRows: [string, string][] = [
   [receipt.isBulk ? 'Acheteur' : hasServices && !hasProducts ? 'Patient' : 'Client', receipt.client || '-']];
   if (receipt.company && receipt.company !== receipt.client) clientRows.push(['Société', receipt.company]);
+  if (receipt.taxId) clientRows.push(['Matricule fiscal', receipt.taxId]);
 
   if (phone) clientRows.push(['Téléphone', phone]);
 

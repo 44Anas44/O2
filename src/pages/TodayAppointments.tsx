@@ -3,6 +3,7 @@ import { CalendarCheckIcon, ClockIcon, PhoneIcon, PlusIcon } from 'lucide-react'
 import { useStore } from '../contexts/StoreContext';
 import { useSaleDialog } from '../components/SaleDialog';
 import { AppointmentSlipButton } from '../components/ReceiptButtons';
+import { useConfirm } from '../components/ui/ConfirmDialog';
 import {
   Badge,
   Button,
@@ -18,6 +19,7 @@ import { fmtLongDate, todayKey, tomorrowKey } from '../utils/date';
 export function TodayAppointments() {
   const { appointments, services, setAppointmentStatus, saleByAppointment, receipts } = useStore();
   const { openSale } = useSaleDialog();
+  const { confirm } = useConfirm();
   const [scope, setScope] = useState<'today' | 'tomorrow'>('today');
 
   const dateKey = scope === 'today' ? todayKey() : tomorrowKey();
@@ -73,9 +75,9 @@ export function TodayAppointments() {
   filter((appointment) => stateOf(appointment) === 'à-payer').
   reduce((sum, appointment) => sum + amountOf(appointment), 0);
 
-  const cancel = (appointment: Appointment) => {
+  const cancel = async (appointment: Appointment) => {
     const message = cancelConfirmMessage(saleByAppointment.get(appointment.id));
-    if (message && !window.confirm(message)) return;
+    if (message && !(await confirm({ title: 'Annuler le rendez-vous', message, confirmLabel: 'Oui, annuler', cancelLabel: 'Non', tone: 'danger' }))) return;
     setAppointmentStatus(appointment.id, 'annulé');
   };
   const remaining = list.filter((appointment) => appointment.status === 'prévu');
